@@ -34,6 +34,9 @@ whois = ["python-whois>=0.9.0"]
 photo = ["Pillow>=10.0.0", "imagehash>=4.3.0"]
 dns = ["dnspython>=2.4.0"]
 extract = ["socid-extractor>=0.0.25"]
+holehe = ["holehe>=1.61", "httpx>=0.24.0"]
+ghunt = ["ghunt>=2.3.0", "httpx>=0.24.0"]
+toutatis = ["toutatis>=1.4"]
 ai = [
     "llama-cpp-python>=0.3.0",
     "huggingface_hub>=0.24.0",
@@ -45,6 +48,10 @@ all = [
     "imagehash>=4.3.0",
     "dnspython>=2.4.0",
     "socid-extractor>=0.0.25",
+    "holehe>=1.61",
+    "httpx>=0.24.0",
+    "ghunt>=2.3.0",
+    "toutatis>=1.4",
     "llama-cpp-python>=0.3.0",
     "huggingface_hub>=0.24.0",
 ]

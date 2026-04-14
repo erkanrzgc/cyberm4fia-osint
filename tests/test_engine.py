@@ -4,15 +4,17 @@
 import pytest
 from aioresponses import aioresponses
 
+from core import engine as engine_mod
 from core.config import ScanConfig
 from core.engine import (
     _extract_avatar_urls,
+    _phase_recursive,
     _select_platforms,
     _status_from_http,
     run_scan,
 )
-from core.models import PlatformResult
-from modules.platforms import PLATFORMS
+from core.models import PlatformResult, ScanResult
+from modules.platforms import PLATFORMS, Platform
 
 
 class TestStatusFromHttp:
@@ -129,19 +131,23 @@ async def test_run_scan_with_deep_scrape():
     dev_platforms = [p for p in PLATFORMS if p.category == "dev"]
 
     with aioresponses() as m:
-        for p in dev_platforms:
-            url = p.url.replace("{username}", "alice")
-            if p.name == "GitHub":
-                m.get(url, status=200, body="", repeat=True)
-            else:
-                m.get(url, status=404, repeat=True)
-        # GitHub deep-scraper API
+        # Register the deep-scraper API mock FIRST so it takes priority over
+        # any platform check that happens to hit the same URL (e.g. the WMN
+        # "GitHub (User)" entry which targets api.github.com/users/{u}).
         m.get(
             "https://api.github.com/users/alice",
             status=200,
             payload={"name": "Alice", "location": "TR"},
             repeat=True,
         )
+        for p in dev_platforms:
+            url = p.url.replace("{username}", "alice")
+            if url == "https://api.github.com/users/alice":
+                continue  # already mocked above
+            if p.name == "GitHub":
+                m.get(url, status=200, body="", repeat=True)
+            else:
+                m.get(url, status=404, repeat=True)
 
         result = await run_scan(cfg)
 
@@ -174,3 +180,66 @@ async def test_run_scan_email_without_hibp_skips_breach(monkeypatch):
         result = await run_scan(cfg)
 
     assert result.emails == []
+
+
+@pytest.mark.asyncio
+async def test_phase_recursive_pivots_on_discovered_username(monkeypatch):
+    """The recursive phase should pick up usernames from profile_data and
+    discovered_usernames, re-run the platform sweep, and tag hits with the
+    pivoted handle so they stay distinguishable from the primary sweep."""
+    cfg = ScanConfig(username="alice", recursive=True, recursive_depth=1, fp_threshold=0.0)
+    platforms = [
+        Platform(name="FakeNet", url="https://fake.test/{username}", category="social",
+                 check_type="status"),
+    ]
+    seed = PlatformResult(
+        platform="GitHub", url="https://gh/alice", category="dev",
+        exists=True, profile_data={"login": "alice_alt"},
+    )
+    result = ScanResult(username="alice")
+    result.platforms = [seed]
+    result.discovered_usernames = ["alice_other"]
+
+    calls: list[str] = []
+
+    async def fake_check_platform(client, username, platform):
+        calls.append(username)
+        return PlatformResult(
+            platform=platform.name,
+            url=platform.url.replace("{username}", username),
+            category=platform.category,
+            exists=True,
+            confidence=1.0,
+            status="found",
+        )
+
+    monkeypatch.setattr(engine_mod, "_check_platform", fake_check_platform)
+
+    await _phase_recursive(client=None, cfg=cfg, platforms=platforms, result=result)
+
+    assert set(calls) == {"alice_alt", "alice_other"}
+    pivot_hits = [r for r in result.platforms if r.status.startswith("found (pivot:")]
+    assert len(pivot_hits) == 2
+    assert {r.status for r in pivot_hits} == {
+        "found (pivot:alice_alt)",
+        "found (pivot:alice_other)",
+    }
+
+
+@pytest.mark.asyncio
+async def test_phase_recursive_disabled_is_noop(monkeypatch):
+    cfg = ScanConfig(username="alice", recursive=False)
+    result = ScanResult(username="alice")
+    result.discovered_usernames = ["bob"]
+
+    called = False
+
+    async def boom(*args, **kwargs):
+        nonlocal called
+        called = True
+        return PlatformResult(platform="x", url="y", category="z")
+
+    monkeypatch.setattr(engine_mod, "_check_platform", boom)
+    await _phase_recursive(client=None, cfg=cfg, platforms=[], result=result)
+
+    assert called is False

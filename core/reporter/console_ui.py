@@ -130,6 +130,10 @@ def print_results(result: ScanResult) -> None:
     _print_deep_profiles(result)
     _print_cross_reference(result)
     _print_emails(result)
+    _print_holehe(result)
+    _print_ghunt(result)
+    _print_toutatis(result)
+    _print_comb_leaks(result)
     _print_photo_matches(result)
     _print_whois(result)
     _print_dns(result)
@@ -322,6 +326,121 @@ def _print_emails(result: ScanResult) -> None:
                 btxt += f"  • {b}\n"
         console.print(
             Panel(btxt.rstrip(), title="[bold red]HIBP Breach[/bold red]", border_style="red")
+        )
+
+
+def _print_comb_leaks(result: ScanResult) -> None:
+    leaks = getattr(result, "comb_leaks", None) or []
+    if not leaks:
+        return
+    console.print()
+    table = Table(
+        title=f"COMB Credential Leaks ({len(leaks)})",
+        box=box.SIMPLE_HEAVY,
+        title_style="bold red",
+        header_style="bold",
+        caption="[dim]Source: ProxyNova COMB public search[/dim]",
+    )
+    table.add_column("Identifier", style="cyan")
+    table.add_column("Password", style="red")
+    table.add_column("Length", justify="right")
+    table.add_column("Extras", style="dim")
+    for leak in leaks[:25]:
+        extras = ", ".join(leak.extras) if getattr(leak, "extras", None) else ""
+        table.add_row(
+            leak.identifier,
+            leak.password_preview or "[dim]—[/dim]",
+            str(leak.raw_length),
+            extras,
+        )
+    console.print(table)
+    if len(leaks) > 25:
+        console.print(f"  [dim]… {len(leaks) - 25} more[/dim]")
+
+
+def _print_holehe(result: ScanResult) -> None:
+    hits = getattr(result, "holehe_hits", None) or []
+    if not hits:
+        return
+    console.print()
+    by_email: dict[str, list] = {}
+    for h in hits:
+        by_email.setdefault(h.email, []).append(h)
+    for email, ehits in by_email.items():
+        tree = Tree(
+            f"[bold cyan]{email}[/bold cyan] — [bold]{len(ehits)}[/bold] registered accounts"
+        )
+        for h in sorted(ehits, key=lambda x: x.site):
+            extra = []
+            if h.email_recovery:
+                extra.append(f"recovery: {h.email_recovery}")
+            if h.phone_recovery:
+                extra.append(f"phone: {h.phone_recovery}")
+            tail = f" [dim]({', '.join(extra)})[/dim]" if extra else ""
+            tree.add(f"[green]✓[/green] {h.site} [dim]{h.domain}[/dim]{tail}")
+        console.print(
+            Panel(
+                tree,
+                title="[bold red]Holehe — Email → Site Enumeration[/bold red]",
+                border_style="red",
+            )
+        )
+
+
+def _print_ghunt(result: ScanResult) -> None:
+    results = getattr(result, "ghunt_results", None) or []
+    if not results:
+        return
+    console.print()
+    table = Table(
+        title="GHunt — Google Account Lookup",
+        box=box.SIMPLE_HEAVY,
+        title_style="bold yellow",
+        header_style="bold",
+    )
+    table.add_column("Email", style="cyan")
+    table.add_column("Name")
+    table.add_column("Gaia ID", style="dim")
+    table.add_column("Services", style="dim")
+    for g in results:
+        table.add_row(
+            g.email,
+            g.name or "[dim]—[/dim]",
+            g.gaia_id or "[dim]—[/dim]",
+            ", ".join(g.services) if g.services else "[dim]—[/dim]",
+        )
+    console.print(table)
+
+
+def _print_toutatis(result: ScanResult) -> None:
+    results = getattr(result, "toutatis_results", None) or []
+    if not results:
+        return
+    console.print()
+    for t in results:
+        body = (
+            f"[bold]Username:[/bold] [cyan]{t.username}[/cyan]\n"
+            f"[bold]User ID:[/bold] {t.user_id or '—'}\n"
+            f"[bold]Full Name:[/bold] {t.full_name or '—'}\n"
+            f"[bold]Followers:[/bold] {t.follower_count:,} | "
+            f"[bold]Following:[/bold] {t.following_count:,}\n"
+            f"[bold]Private:[/bold] {'Yes' if t.is_private else 'No'} | "
+            f"[bold]Verified:[/bold] {'Yes' if t.is_verified else 'No'}"
+        )
+        if t.biography:
+            body += f"\n[bold]Bio:[/bold] {t.biography[:200]}"
+        if t.external_url:
+            body += f"\n[bold]URL:[/bold] [blue]{t.external_url}[/blue]"
+        if t.obfuscated_email:
+            body += f"\n[bold red]Obf. Email:[/bold red] {t.obfuscated_email}"
+        if t.obfuscated_phone:
+            body += f"\n[bold red]Obf. Phone:[/bold red] {t.obfuscated_phone}"
+        console.print(
+            Panel(
+                body,
+                title="[bold magenta]Toutatis — Instagram Profile[/bold magenta]",
+                border_style="magenta",
+            )
         )
 
 

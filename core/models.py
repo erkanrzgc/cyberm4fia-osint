@@ -79,6 +79,10 @@ class ScanResult:
     dns_records: dict = field(default_factory=dict)
     subdomains: list = field(default_factory=list)
     photo_matches: list = field(default_factory=list)
+    comb_leaks: list = field(default_factory=list)  # CombLeak entries
+    holehe_hits: list = field(default_factory=list)  # HoleheHit entries
+    ghunt_results: list = field(default_factory=list)  # GHuntResult entries
+    toutatis_results: list = field(default_factory=list)  # ToutatisResult entries
     scan_time: float = 0.0
     ai_report: dict | None = None
 
@@ -146,5 +150,57 @@ class ScanResult:
                 for m in self.photo_matches
             ],
             "web_presence": self.web_presence,
+            "comb_leaks": [
+                {
+                    "identifier": leak.identifier,
+                    "password_preview": leak.password_preview,
+                    "raw_length": leak.raw_length,
+                    "source": leak.source,
+                    "extras": list(leak.extras),
+                }
+                for leak in self.comb_leaks
+            ],
+            "holehe_hits": [
+                {
+                    "email": hit.email,
+                    "site": hit.site,
+                    "domain": hit.domain,
+                    "method": hit.method,
+                    "email_recovery": hit.email_recovery,
+                    "phone_recovery": hit.phone_recovery,
+                    "others": [list(pair) for pair in hit.others],
+                }
+                for hit in self.holehe_hits
+            ],
+            "ghunt_results": [
+                {
+                    "email": g.email,
+                    "gaia_id": g.gaia_id,
+                    "name": g.name,
+                    "profile_picture": g.profile_picture,
+                    "cover_picture": g.cover_picture,
+                    "last_edit": g.last_edit,
+                    "container_types": list(g.container_types),
+                    "services": list(g.services),
+                }
+                for g in self.ghunt_results
+            ],
+            "toutatis_results": [
+                {
+                    "username": t.username,
+                    "user_id": t.user_id,
+                    "full_name": t.full_name,
+                    "is_private": t.is_private,
+                    "is_verified": t.is_verified,
+                    "follower_count": t.follower_count,
+                    "following_count": t.following_count,
+                    "biography": t.biography,
+                    "external_url": t.external_url,
+                    "obfuscated_email": t.obfuscated_email,
+                    "obfuscated_phone": t.obfuscated_phone,
+                    "profile_pic": t.profile_pic,
+                }
+                for t in self.toutatis_results
+            ],
             "ai_report": self.ai_report,
         }

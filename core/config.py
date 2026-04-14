@@ -72,6 +72,11 @@ class ScanConfig:
     photo: bool = False
     dns: bool = False
     subdomain: bool = False
+    holehe: bool = False
+    ghunt: bool = False
+    toutatis: bool = False
+    recursive: bool = False
+    recursive_depth: int = 1
     proxy: str | None = None
     tor: bool = False
     categories: tuple[str, ...] | None = None
@@ -93,10 +98,16 @@ class ScanConfig:
         photo = args.photo or full_default
         dns = args.dns or full_default
         subdomain = args.subdomain or full_default
+        holehe = getattr(args, "holehe", False) or full_default
+        ghunt = getattr(args, "ghunt", False) or full_default
+        toutatis = getattr(args, "toutatis", False) or full_default
+        recursive = getattr(args, "recursive", False) or full_default
+        recursive_depth = int(getattr(args, "recursive_depth", 1) or 1)
 
         if args.full:
             deep = smart = email = web = True
             whois = breach = photo = dns = subdomain = True
+            holehe = ghunt = toutatis = recursive = True
 
         if breach and not email:
             email = True
@@ -116,6 +127,11 @@ class ScanConfig:
             photo=photo,
             dns=dns,
             subdomain=subdomain,
+            holehe=holehe,
+            ghunt=ghunt,
+            toutatis=toutatis,
+            recursive=recursive,
+            recursive_depth=recursive_depth,
             proxy=args.proxy,
             tor=args.tor,
             categories=categories,
@@ -135,6 +151,10 @@ class ScanConfig:
             (self.photo, "Photo"),
             (self.dns, "DNS"),
             (self.subdomain, "Subdomain"),
+            (self.holehe, "Holehe"),
+            (self.ghunt, "GHunt"),
+            (self.toutatis, "Toutatis"),
+            (self.recursive, "Recursive"),
             (self.tor, "Tor"),
         ]
         for flag, label in mapping:

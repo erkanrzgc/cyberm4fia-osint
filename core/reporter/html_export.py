@@ -128,6 +128,102 @@ def _emails_block(data: dict) -> str:
     </table>"""
 
 
+def _comb_block(data: dict) -> str:
+    leaks = data.get("comb_leaks") or []
+    if not leaks:
+        return ""
+    rows = "".join(
+        f"""
+        <tr>
+            <td>{escape(leak['identifier'])}</td>
+            <td>{escape(leak['password_preview'] or '-')}</td>
+            <td>{escape(str(leak['raw_length']))}</td>
+            <td>{escape(leak.get('source', ''))}</td>
+            <td>{_fmt(leak.get('extras') or [])}</td>
+        </tr>"""
+        for leak in leaks
+    )
+    return f"""
+    <h2>COMB Credential Leaks ({len(leaks)})</h2>
+    <p class="muted">Source: ProxyNova COMB public search. Passwords are masked.</p>
+    <table>
+        <tr><th>Identifier</th><th>Password</th><th>Length</th><th>Source</th><th>Extras</th></tr>
+        {rows}
+    </table>"""
+
+
+def _holehe_block(data: dict) -> str:
+    hits = data.get("holehe_hits") or []
+    if not hits:
+        return ""
+    by_email: dict[str, list] = {}
+    for h in hits:
+        by_email.setdefault(h["email"], []).append(h)
+    cards = ""
+    for email, ehits in by_email.items():
+        items = "".join(
+            f"<li>{escape(h['site'])} <span class='muted'>({escape(h['domain'])})</span></li>"
+            for h in sorted(ehits, key=lambda x: x["site"])
+        )
+        cards += f"""
+        <div class="card">
+            <h3>{escape(email)} <span class="muted">— {len(ehits)} accounts</span></h3>
+            <ul>{items}</ul>
+        </div>"""
+    return f"""
+    <h2>Holehe — Email → Site Enumeration</h2>
+    <div class="grid grid-2">{cards}</div>"""
+
+
+def _ghunt_block(data: dict) -> str:
+    results = data.get("ghunt_results") or []
+    if not results:
+        return ""
+    rows = "".join(
+        f"""
+        <tr>
+            <td>{escape(g['email'])}</td>
+            <td>{escape(g['name'] or '-')}</td>
+            <td>{escape(g['gaia_id'] or '-')}</td>
+            <td>{_fmt(g.get('services') or [])}</td>
+        </tr>"""
+        for g in results
+    )
+    return f"""
+    <h2>GHunt — Google Account Lookup</h2>
+    <table>
+        <tr><th>Email</th><th>Name</th><th>Gaia ID</th><th>Services</th></tr>
+        {rows}
+    </table>"""
+
+
+def _toutatis_block(data: dict) -> str:
+    results = data.get("toutatis_results") or []
+    if not results:
+        return ""
+    cards = ""
+    for t in results:
+        cards += f"""
+        <div class="card">
+            <h3>@{escape(t['username'])}</h3>
+            <ul>
+                <li><strong>User ID:</strong> {escape(t['user_id'] or '-')}</li>
+                <li><strong>Full Name:</strong> {escape(t['full_name'] or '-')}</li>
+                <li><strong>Followers:</strong> {escape(str(t['follower_count']))}</li>
+                <li><strong>Following:</strong> {escape(str(t['following_count']))}</li>
+                <li><strong>Private:</strong> {_fmt(t['is_private'])}</li>
+                <li><strong>Verified:</strong> {_fmt(t['is_verified'])}</li>
+                <li><strong>Bio:</strong> {escape(t['biography'] or '-')}</li>
+                <li><strong>URL:</strong> {escape(t['external_url'] or '-')}</li>
+                <li><strong>Obf. Email:</strong> {escape(t['obfuscated_email'] or '-')}</li>
+                <li><strong>Obf. Phone:</strong> {escape(t['obfuscated_phone'] or '-')}</li>
+            </ul>
+        </div>"""
+    return f"""
+    <h2>Toutatis — Instagram Profiles</h2>
+    <div class="grid grid-2">{cards}</div>"""
+
+
 def _photo_block(data: dict) -> str:
     if not data["photo_matches"]:
         return ""
@@ -264,6 +360,10 @@ def render_html(data: dict) -> str:
 
     {_cross_reference_block(data)}
     {_emails_block(data)}
+    {_holehe_block(data)}
+    {_ghunt_block(data)}
+    {_toutatis_block(data)}
+    {_comb_block(data)}
     {_photo_block(data)}
     {_web_presence_block(data)}
     {_whois_block(data)}

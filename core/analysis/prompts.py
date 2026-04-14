@@ -101,6 +101,48 @@ def _trim_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "web_presence": payload.get("web_presence", [])[:10],
         "photo_matches": payload.get("photo_matches", []),
         "cross_reference": payload.get("cross_reference", {}),
+        "comb_leaks": [
+            {
+                "identifier": leak.get("identifier"),
+                "password_preview": leak.get("password_preview"),
+                "raw_length": leak.get("raw_length"),
+                "source": leak.get("source"),
+            }
+            for leak in payload.get("comb_leaks", [])
+        ],
+        "holehe_hits": [
+            {
+                "email": h.get("email"),
+                "site": h.get("site"),
+                "domain": h.get("domain"),
+            }
+            for h in payload.get("holehe_hits", [])
+        ],
+        "ghunt_results": [
+            {
+                "email": g.get("email"),
+                "name": g.get("name"),
+                "gaia_id": g.get("gaia_id"),
+                "services": g.get("services", []),
+            }
+            for g in payload.get("ghunt_results", [])
+        ],
+        "toutatis_results": [
+            {
+                "username": t.get("username"),
+                "user_id": t.get("user_id"),
+                "full_name": t.get("full_name"),
+                "is_private": t.get("is_private"),
+                "is_verified": t.get("is_verified"),
+                "follower_count": t.get("follower_count"),
+                "following_count": t.get("following_count"),
+                "biography": t.get("biography"),
+                "external_url": t.get("external_url"),
+                "obfuscated_email": t.get("obfuscated_email"),
+                "obfuscated_phone": t.get("obfuscated_phone"),
+            }
+            for t in payload.get("toutatis_results", [])
+        ],
     }
 
 

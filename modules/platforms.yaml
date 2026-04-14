@@ -6743,3 +6743,1393 @@ platforms:
 - name: svidbook
   url: https://www.svidbook.ru/user/{username}
   category: community
+- name: YouTube User
+  url: https://www.youtube.com/user/{username}/about
+  category: content
+  check_type: content_present
+  success_text: joinedDateText
+- name: Plurk
+  url: https://www.plurk.com/{username}
+  category: social
+  check_type: content_present
+  success_text: Profile views
+- name: 247CTF
+  url: https://247ctf.com/progress/{username}
+  category: dev
+  check_type: content_present
+  success_text: property="og:url"
+- name: 35photo
+  url: https://35photo.pro/@{username}/
+  category: social
+  check_type: content_present
+  success_text: <span title="Total photos
+- name: 3DNews
+  url: https://forum.3dnews.tech/member.php?username={username}
+  category: social
+  check_type: content_present
+  success_text: 'Просмотр профиля:'
+- name: ADVFN
+  url: https://uk.advfn.com/forum/profile/{username}
+  category: professional
+  check_type: content_present
+  success_text: Profile | ADVFN
+- name: Airline_Pilot_Life
+  url: https://airlinepilot.life/u/{username}.json
+  category: social
+  check_type: content_present
+  success_text: primary_group_name
+- name: Albicla
+  url: https://albicla.com/{username}/post/1
+  category: social
+  check_type: content_present
+  success_text: 500 Post tymczasowo niedostępny
+- name: alik
+  url: https://www.alik.cz/u/{username}
+  category: social
+  check_type: content_present
+  success_text: Vizitka – Alík.cz</title>
+- name: Alura
+  url: https://cursos.alura.com.br/user/{username}
+  category: dev
+  check_type: content_present
+  success_text: Perfil de
+- name: Apex Legends
+  url: https://api.tracker.gg/api/v2/apex/standard/profile/origin/{username}
+  category: gaming
+  check_type: content_present
+  success_text: platformInfo
+- name: Arch Linux GitLab
+  url: https://gitlab.archlinux.org/api/v4/users?username={username}
+  category: social
+  check_type: content_present
+  success_text: '"id":'
+- name: ArchWiki
+  url: https://wiki.archlinux.org/api.php?action=query&format=json&list=users&ususers={username}&usprop=cancreate&formatversion=2&errorformat=html&errorsuselocal=true&uselang=en
+  category: social
+  check_type: content_present
+  success_text: '"userid":'
+- name: Arduino (Forum)
+  url: https://forum.arduino.cc/u/{username}.json
+  category: dev
+  check_type: content_present
+  success_text: '"id":'
+- name: ArtBreeder
+  url: https://www.artbreeder.com/{username}
+  category: content
+  check_type: content_present
+  success_text: <title>
+- name: BabyPips
+  url: https://forums.babypips.com/u/{username}.json
+  category: social
+  check_type: content_present
+  success_text: user_badges
+- name: Bento
+  url: https://bento.me/{username}
+  category: social
+  check_type: content_present
+  success_text: href="https://bento.me/explore"
+- name: BIGO Live
+  url: https://www.bigo.tv/user/{username}
+  category: gaming
+  check_type: content_present
+  success_text: userInfo:{nickName
+- name: Bikemap
+  url: https://www.bikemap.net/en/u/{username}/routes/created/
+  category: community
+  check_type: content_present
+  success_text: '- 🚲 Bikemap</title>'
+- name: Bimpos
+  url: https://ask.bimpos.com/user/{username}
+  category: dev
+  check_type: content_present
+  success_text: '<title>User '
+- name: Bio Sites
+  url: https://bio.site/{username}
+  category: social
+  check_type: content_present
+  success_text: section":{"handles
+- name: biolink
+  url: https://bio.link/{username}
+  category: community
+  check_type: content_present
+  success_text: profile:username
+- name: Bluesky 1
+  url: https://bsky.app/profile/{username}
+  category: social
+  check_type: content_present
+  success_text: on Bluesky
+- name: Bluesky 2
+  url: https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile?actor={username}.bsky.social
+  category: social
+  check_type: content_present
+  success_text: '"handle":"'
+- name: BodyBuilding.com
+  url: http://api.bodybuilding.com/api-proxy/bbc/get?slug={username}
+  category: community
+  check_type: content_present
+  success_text: username
+- name: Booknode
+  url: https://booknode.com/profil/{username}
+  category: community
+  check_type: content_present
+  success_text: <title>Profil de
+- name: Brickset
+  url: https://brickset.com/profile/{username}
+  category: community
+  check_type: content_present
+  success_text: Member since:</dt>
+- name: Bunpro
+  url: https://community.bunpro.jp/u/{username}.json
+  category: social
+  check_type: content_present
+  success_text: username
+- name: cafecito
+  url: https://cafecito.app/{username}
+  category: community
+  check_type: content_present
+  success_text: ' | Cafecito</title>'
+- name: Cameo
+  url: https://www.cameo.com/{username}
+  category: professional
+  check_type: content_present
+  success_text: aggregateRating
+- name: cfx.re
+  url: https://forum.cfx.re/u/{username}.json
+  category: gaming
+  check_type: content_present
+  success_text: created_at
+- name: chatango.com
+  url: https://{username}.chatango.com
+  category: social
+  check_type: content_present
+  success_text: <title>Chatango!
+- name: Cloudflare
+  url: https://community.cloudflare.com/u/{username}/card.json
+  category: dev
+  check_type: content_present
+  success_text: user_avatar
+- name: Coda
+  url: https://coda.io/@{username}/
+  category: community
+  check_type: content_present
+  success_text: '- Coda Profile</title>'
+- name: Code Project
+  url: https://www.codeproject.com/Members/{username}
+  category: dev
+  check_type: content_present
+  success_text: Member since
+- name: Codeberg
+  url: https://codeberg.org/api/v1/users/{username}
+  category: dev
+  check_type: content_present
+  success_text: '"id":'
+- name: Codeforces
+  url: https://codeforces.com/api/user.info?handles={username}
+  category: dev
+  check_type: content_present
+  success_text: '"status":"OK"'
+- name: Cropty
+  url: https://api.cropty.io/v1/auth/{username}
+  category: professional
+  check_type: content_present
+  success_text: '"name":'
+- name: darudar
+  url: https://darudar.org/users/{username}/
+  category: community
+  check_type: content_present
+  success_text: . Дарудар
+- name: dateinasia
+  url: https://www.dateinasia.com/{username}
+  category: dating
+  check_type: content_present
+  success_text: About me
+- name: DDoSecrets
+  url: https://search.ddosecrets.com/search?q={username}
+  category: community
+  check_type: content_present
+  success_text: aria-label="Search result pages"
+- name: Designspriation
+  url: https://www.designspiration.com/{username}/
+  category: content
+  check_type: content_present
+  success_text: has discovered on Designspiration
+- name: destream
+  url: https://api.destream.net/siteapi/v2/live/details/{username}
+  category: professional
+  check_type: content_present
+  success_text: '"userName":'
+- name: Destructoid
+  url: https://www.destructoid.com/?name={username}
+  category: social
+  check_type: content_present
+  success_text: Follow
+- name: dfgames
+  url: https://www.dfgames.com.br/user/{username}
+  category: gaming
+  check_type: content_present
+  success_text: Reputa
+- name: Diablo
+  url: https://diablo2.io/member/{username}/
+  category: gaming
+  check_type: content_present
+  success_text: 'Viewing profile - '
+- name: DIBIZ
+  url: https://www.dibiz.com/{username}
+  category: professional
+  check_type: content_present
+  success_text: Add to contacts</span>
+- name: Discord (Invite)
+  url: https://discord.com/api/v9/invites/{username}?with_counts=true&with_expiration=true
+  category: social
+  check_type: content_present
+  success_text: '"channel":'
+- name: Discourse
+  url: https://meta.discourse.org/u/{username}/summary.json
+  category: community
+  check_type: content_present
+  success_text: topics
+- name: Docker Hub (Organization)
+  url: https://hub.docker.com/v2/orgs/{username}/
+  category: dev
+  check_type: content_present
+  success_text: '"uuid":'
+- name: Docker Hub (User)
+  url: https://hub.docker.com/v2/users/{username}/
+  category: dev
+  check_type: content_present
+  success_text: '"uuid":'
+- name: Donatello
+  url: https://donatello.to/{username}
+  category: professional
+  check_type: content_present
+  success_text: UserPage.init
+- name: Donatik
+  url: https://{username}.donatik.io/en
+  category: professional
+  check_type: content_present
+  success_text: \"__typename\":\"User\"
+- name: Donation Alerts
+  url: https://www.donationalerts.com/api/v1/user/{username}/donationpagesettings
+  category: professional
+  check_type: content_present
+  success_text: '"data":'
+- name: Donatty
+  url: https://api.donatty.com/users/find/{username}
+  category: professional
+  check_type: content_present
+  success_text: '"response":'
+- name: dot.cards
+  url: https://dot.cards/{username}
+  category: professional
+  check_type: content_present
+  success_text: 'status": "success'
+- name: Dota2.ru
+  url: https://dota2.ru/forum/search/?type=user&keywords={username}&sort_by=username
+  category: gaming
+  check_type: content_present
+  success_text: class="forum-section__item forum-section__item--first"
+- name: DOTAFire
+  url: https://www.dotafire.com/ajax/searchSite?text={username}&search=members
+  category: gaming
+  check_type: content_present
+  success_text: href="/profile/
+- name: easyen
+  url: https://easyen.ru/index/8-0-{username}
+  category: social
+  check_type: content_present
+  success_text: День рождения
+- name: ebay_stores
+  url: https://www.ebay.com/str/{username}
+  category: professional
+  check_type: content_present
+  success_text: '| eBay Stores</title>'
+- name: Etoro
+  url: https://www.etoro.com/api/logininfo/v1.1/users/{username}
+  category: professional
+  check_type: content_present
+  success_text: '"gcid":'
+- name: Etsy
+  url: https://www.etsy.com/people/{username}
+  category: professional
+  check_type: content_present
+  success_text: ' favorite items - Etsy</title>'
+- name: Evolution CMS
+  url: https://community.evocms.ru/users/?search={username}
+  category: dev
+  check_type: content_present
+  success_text: id="user-search"
+- name: Expressional.social (Mastodon Instance)
+  url: https://expressional.social/api/v1/accounts/lookup?acct={username}
+  category: social
+  check_type: content_present
+  success_text: display_name
+- name: FACEIT
+  url: https://www.faceit.com/api/users/v1/nicknames/{username}
+  category: gaming
+  check_type: content_present
+  success_text: '"result":"OK"'
+- name: Federated.press (Mastodon Instance)
+  url: https://federated.press/api/v1/accounts/lookup?acct={username}
+  category: social
+  check_type: content_present
+  success_text: display_name
+- name: Filmot Channel Search
+  url: https://filmot.com/channelsearch/{username}
+  category: community
+  check_type: content_present
+  success_text: Subscribers
+- name: Filmot Unlisted Videos
+  url: https://filmot.com/unlistedSearch?channelQuery={username}&sortField=uploaddate&sortOrder=desc&
+  category: community
+  check_type: content_present
+  success_text: clips found
+- name: fine_art_america
+  url: https://fineartamerica.com/profiles/{username}
+  category: professional
+  check_type: content_present
+  success_text: Shop for artwork by
+- name: flowcode
+  url: https://www.flowcode.com/page/{username}
+  category: social
+  check_type: content_present
+  success_text: ;s Flowpage
+- name: Folkd
+  url: https://www.folkd.com/?app=core&module=system&controller=ajax&do=usernameExists&input={username}
+  category: social
+  check_type: content_present
+  success_text: '"message":"That display name is in use by another member."'
+- name: forumprawne.org
+  url: https://forumprawne.org/members/{username}.html
+  category: community
+  check_type: content_present
+  success_text: Wiadomość
+- name: Fosstodon.org (Mastodon Instance)
+  url: https://fosstodon.org/api/v1/accounts/lookup?acct={username}
+  category: social
+  check_type: content_present
+  success_text: display_name
+- name: Fotolog Archived Profile
+  url: https://archive.org/wayback/available?url=https://www.fotolog.com/{username}
+  category: community
+  check_type: content_present
+  success_text: '"archived_snapshots": {"closest"'
+- name: Freelancehunt (Employer)
+  url: https://freelancehunt.com/en/employer/{username}.html
+  category: social
+  check_type: content_present
+  success_text: '"@id":"https://freelancehunt.com/en/employers"'
+- name: Freelancehunt (Freelancer)
+  url: https://freelancehunt.com/en/freelancer/{username}.html
+  category: social
+  check_type: content_present
+  success_text: '"@id":"https://freelancehunt.com/en/freelancers"'
+- name: FreeSteamKeys
+  url: https://www.freesteamkeys.com/members/{username}/
+  category: gaming
+  check_type: content_present
+  success_text: item-header-avatar
+- name: FriendFinder
+  url: https://friendfinder.com/profile/{username}
+  category: dating
+  check_type: content_present
+  success_text: 'Last Visit:'
+- name: Game Jolt
+  url: https://gamejolt.com/site-api/web/profile/@{username}/
+  category: gaming
+  check_type: content_present
+  success_text: created_on
+- name: game_debate
+  url: https://www.game-debate.com/profile/{username}
+  category: gaming
+  check_type: content_present
+  success_text: '| , , GB pc game performance'
+- name: Gamer DVR
+  url: https://gamerdvr.com/gamer/{username}
+  category: gaming
+  check_type: content_present
+  success_text: class="gamerpic"
+- name: Garmin connect
+  url: https://connect.garmin.com/modern/profile/{username}
+  category: community
+  check_type: content_present
+  success_text: window.ERROR_VIEW = null
+- name: GDBrowser
+  url: https://gdbrowser.com/api/profile/{username}
+  category: gaming
+  check_type: content_present
+  success_text: '"accountID":'
+- name: GeeksForGeeks
+  url: https://authapi.geeksforgeeks.org/api-get/user-profile-info/?handle={username}
+  category: dev
+  check_type: content_present
+  success_text: '"message":"data retrieved successfully"'
+- name: getmonero
+  url: https://forum.getmonero.org/user/{username}
+  category: community
+  check_type: content_present
+  success_text: Monero | User
+- name: Gettr
+  url: https://gettr.com/api/s/uinf/{username}
+  category: social
+  check_type: content_present
+  success_text: '"rc":"OK"'
+- name: Gigapan
+  url: https://www.gigapan.com/profiles/{username}
+  category: community
+  check_type: content_present
+  success_text: width="100"
+- name: Giphy (Channel)
+  url: https://giphy.com/channel/{username}
+  category: content
+  check_type: content_present
+  success_text: \"user_id\"
+- name: GitHub (Gists)
+  url: https://api.github.com/users/{username}/gists
+  category: dev
+  check_type: content_present
+  success_text: '"id":'
+- name: GitHub (User)
+  url: https://api.github.com/users/{username}
+  category: dev
+  check_type: content_present
+  success_text: '"id":'
+- name: GNOME (GitLab)
+  url: https://gitlab.gnome.org/api/v4/users?username={username}
+  category: dev
+  check_type: content_present
+  success_text: '"username":'
+- name: GNOME (Shell Extensions)
+  url: https://extensions.gnome.org/accounts/profile/{username}
+  category: dev
+  check_type: content_present
+  success_text: class="user-details"
+- name: grandprof
+  url: https://grandprof.org/communaute/{username}
+  category: community
+  check_type: content_present
+  success_text: s Profile
+- name: Graphics.social (Mastodon Instance)
+  url: https://graphics.social/api/v1/accounts/lookup?acct={username}
+  category: social
+  check_type: content_present
+  success_text: display_name
+- name: Greasy Fork
+  url: https://greasyfork.org/en/users?q={username}
+  category: dev
+  check_type: content_present
+  success_text: class="user-list"
+- name: GTAinside.com
+  url: https://www.gtainside.com/user/{username}
+  category: gaming
+  check_type: content_present
+  success_text: userpage_user
+- name: Habbo.com
+  url: https://www.habbo.com/api/public/users?name={username}
+  category: gaming
+  check_type: content_present
+  success_text: 'uniqueId":'
+- name: Habbo.com.br
+  url: https://www.habbo.com.br/api/public/users?name={username}
+  category: gaming
+  check_type: content_present
+  success_text: 'uniqueId":'
+- name: Habbo.com.tr
+  url: https://www.habbo.com.tr/api/public/users?name={username}
+  category: gaming
+  check_type: content_present
+  success_text: 'uniqueId":'
+- name: Habbo.de
+  url: https://www.habbo.de/api/public/users?name={username}
+  category: gaming
+  check_type: content_present
+  success_text: 'uniqueId":'
+- name: Habbo.es
+  url: https://www.habbo.es/api/public/users?name={username}
+  category: gaming
+  check_type: content_present
+  success_text: 'uniqueId":'
+- name: Habbo.fi
+  url: https://www.habbo.fi/api/public/users?name={username}
+  category: gaming
+  check_type: content_present
+  success_text: 'uniqueId":'
+- name: Habbo.fr
+  url: https://www.habbo.fr/api/public/users?name={username}
+  category: gaming
+  check_type: content_present
+  success_text: 'uniqueId":'
+- name: Habbo.it
+  url: https://www.habbo.it/api/public/users?name={username}
+  category: gaming
+  check_type: content_present
+  success_text: 'uniqueId":'
+- name: Habbo.nl
+  url: https://www.habbo.nl/api/public/users?name={username}
+  category: gaming
+  check_type: content_present
+  success_text: 'uniqueId":'
+- name: Habtium
+  url: https://habtium.es/{username}
+  category: gaming
+  check_type: content_present
+  success_text: <div class="profile-info
+- name: Hackadvisor
+  url: https://hackadvisor.io/api/v2/profile/{username}/
+  category: dev
+  check_type: content_present
+  success_text: '"username":'
+- name: hamaha
+  url: https://hamaha.net/{username}
+  category: professional
+  check_type: content_present
+  success_text: id="profile"
+- name: Hcommons.social (Mastodon Instance)
+  url: https://hcommons.social/api/v1/accounts/lookup?acct={username}
+  category: social
+  check_type: content_present
+  success_text: display_name
+- name: Heylink
+  url: https://heylink.me/{username}/
+  category: community
+  check_type: content_present
+  success_text: HeyLink.me |
+- name: hiberworld
+  url: https://hiberworld.com/user/{username}
+  category: gaming
+  check_type: content_present
+  success_text: 'Member since '
+- name: HiHello
+  url: https://www.hihello.me/author/{username}
+  category: professional
+  check_type: content_present
+  success_text: '<title>HiHello Blog Author: '
+- name: HomeDesign3D
+  url: https://en.homedesign3d.net/user/{username}
+  category: community
+  check_type: content_present
+  success_text: userspace
+- name: Hometech.social (Mastodon Instance)
+  url: https://hometech.social/api/v1/accounts/lookup?acct={username}
+  category: social
+  check_type: content_present
+  success_text: display_name
+- name: hoo.be
+  url: https://hoo.be/{username}
+  category: professional
+  check_type: content_present
+  success_text: --profile-name-color
+- name: Hostux.social (Mastodon Instance)
+  url: https://hostux.social/api/v1/accounts/lookup?acct={username}
+  category: social
+  check_type: content_present
+  success_text: display_name
+- name: HulkShare
+  url: https://www.hulkshare.com/{username}
+  category: social
+  check_type: content_present
+  success_text: id="profile_image"
+- name: Iconfinder
+  url: https://www.iconfinder.com/{username}
+  category: content
+  check_type: content_present
+  success_text: data-to-user-id=
+- name: icq-chat
+  url: https://icq.icqchat.co/members/{username}/
+  category: social
+  check_type: content_present
+  success_text: Last seen
+- name: ilovegrowingmarijuana
+  url: https://support.ilovegrowingmarijuana.com/u/{username}
+  category: social
+  check_type: content_present
+  success_text: '<title>  Profile - '
+- name: Instagram_archives
+  url: https://archive.org/wayback/available?url=https://instagram.com/{username}/
+  category: social
+  check_type: content_present
+  success_text: '"archived_snapshots": {"closest"'
+- name: Internet Archive User Search
+  url: https://archive.org/advancedsearch.php?q={username}&output=json
+  category: community
+  check_type: content_present
+  success_text: backup_location
+- name: iXBT Forum
+  url: https://forum.ixbt.com/users.cgi?id=info:{username}
+  category: dev
+  check_type: content_present
+  success_text: 'Информация об участнике:'
+- name: Japandict
+  url: https://forum.japandict.com/u/{username}
+  category: social
+  check_type: content_present
+  success_text: modern browser
+- name: kipin
+  url: https://kipin.app/{username}
+  category: professional
+  check_type: content_present
+  success_text: kipin.app/data/photos/resized2/
+- name: KnowYourMeme
+  url: https://knowyourmeme.com/users/{username}
+  category: social
+  check_type: content_present
+  success_text: Contributions
+- name: komi
+  url: https://api.komi.io/api/talent/usernames/{username}
+  category: social
+  check_type: content_present
+  success_text: accountStatus":"active
+- name: Kwai
+  url: https://www.kwai.com/@{username}
+  category: social
+  check_type: content_present
+  success_text: name="title"
+- name: LeakIX
+  url: https://leakix.net/u/{username}
+  category: dev
+  check_type: content_present
+  success_text: '>Joined '
+- name: Lemon8
+  url: https://www.lemon8-app.com/{username}?region=us
+  category: social
+  check_type: content_present
+  success_text: class="user-desc-main-info
+- name: LevelBlue
+  url: https://otx.alienvault.com/otxapi/auth/validate?username={username}
+  category: social
+  check_type: content_present
+  success_text: '"username": ["This username is already taken"]'
+- name: Libretooth.gr (Mastodon Instance)
+  url: https://libretooth.gr/api/v1/accounts/lookup?acct={username}
+  category: social
+  check_type: content_present
+  success_text: display_name
+- name: lichess.org
+  url: https://lichess.org/api/player/autocomplete?term={username}&exists=1
+  category: gaming
+  check_type: content_present
+  success_text: 'true'
+- name: livemaster.ru
+  url: https://www.livemaster.ru/{username}
+  category: professional
+  check_type: content_present
+  success_text: <title>Магазин мастера
+- name: LoLProfile
+  url: https://lolprofile.net/search/world/{username}-world
+  category: gaming
+  check_type: content_present
+  success_text: class="content sw">
+- name: Lor.sh (Mastodon Instance)
+  url: https://lor.sh/api/v1/accounts/lookup?acct={username}
+  category: social
+  check_type: content_present
+  success_text: display_name
+- name: Magix
+  url: https://www.magix.info/us/users/profile/{username}/
+  category: content
+  check_type: content_present
+  success_text: About me
+- name: Malpedia Actors
+  url: https://malpedia.caad.fkie.fraunhofer.de/actor/{username}
+  category: dev
+  check_type: content_present
+  success_text: href="/actors"
+- name: Mapstodon.space (Mastodon Instance)
+  url: https://mapstodon.space/api/v1/accounts/lookup?acct={username}
+  category: social
+  check_type: content_present
+  success_text: display_name
+- name: Maroc_nl
+  url: https://www.maroc.nl/forums/members/{username}.html
+  category: social
+  check_type: content_present
+  success_text: 'Bekijk Profiel:'
+- name: masto.ai
+  url: https://masto.ai/@{username}
+  category: social
+  check_type: content_present
+  success_text: '@masto.ai) - Mastodon</title>'
+- name: Masto.nyc (Mastodon Instance)
+  url: https://masto.nyc/api/v1/accounts/lookup?acct={username}
+  category: social
+  check_type: content_present
+  success_text: display_name
+- name: Mastodon API
+  url: https://mastodon.social/api/v2/search?q={username}&limit=1&type=accounts
+  category: social
+  check_type: content_present
+  success_text: display_name
+- name: Mastodon-C.IM
+  url: https://c.im/@{username}
+  category: social
+  check_type: content_present
+  success_text: '@c.im) - C.IM</title>'
+- name: Mastodon-climatejustice.rocks
+  url: https://climatejustice.rocks/api/v1/accounts/lookup?acct={username}
+  category: social
+  check_type: content_present
+  success_text: 'username":'
+- name: Mastodon-Defcon
+  url: https://defcon.social/@{username}
+  category: social
+  check_type: content_present
+  success_text: '- DEF CON Social</title>'
+- name: Mastodon-meow.social
+  url: https://meow.social/@{username}
+  category: social
+  check_type: content_present
+  success_text: '- the mastodon instance for creatures fluffy, scaly and otherwise</title>'
+- name: Mastodon-Toot.Community
+  url: https://toot.community/@{username}
+  category: social
+  check_type: content_present
+  success_text: '@toot.community) - toot.community</title>'
+- name: Mastodon.online
+  url: https://mastodon.online/@{username}
+  category: social
+  check_type: content_present
+  success_text: '@mastodon.online) - Mastodon</title>'
+- name: Mastodonbooks.net (Mastodon Instance)
+  url: https://mastodonbooks.net/api/v1/accounts/lookup?acct={username}
+  category: social
+  check_type: content_present
+  success_text: display_name
+- name: MCName (Minecraft)
+  url: https://mcname.info/en/search?q={username}
+  category: gaming
+  check_type: content_present
+  success_text: card mb-3 text-monospace
+- name: Meta-Wiki (Wikimedia)
+  url: https://meta.wikimedia.org/wiki/Special:CentralAuth?target={username}
+  category: content
+  check_type: content_present
+  success_text: id='mw-centralauth-info'
+- name: Metacritic
+  url: https://www.metacritic.com/user/{username}/
+  category: community
+  check_type: content_present
+  success_text: class="c-pageProfile-wrapper"
+- name: Mixi
+  url: https://mixi.jp/view_community.pl?id={username}
+  category: social
+  check_type: content_present
+  success_text: '| mixiコミュニティ</title>'
+- name: MobileGTA.net
+  url: https://www.mobilegta.net/en/user/{username}
+  category: gaming
+  check_type: content_present
+  success_text: userpage_user
+- name: Mod DB
+  url: https://www.moddb.com/html/scripts/autocomplete.php?a=username&q={username}
+  category: gaming
+  check_type: content_present
+  success_text: '"available":false'
+- name: MODX.im
+  url: https://modx.evo.im/profile/{username}/
+  category: dev
+  check_type: content_present
+  success_text: class="profile"
+- name: Moto Trip
+  url: https://moto-trip.com/profil/{username}
+  category: community
+  check_type: content_present
+  success_text: '<h1 class="h2">Profil de '
+- name: Moxfield
+  url: https://api2.moxfield.com/v1/users/{username}
+  category: gaming
+  check_type: content_present
+  success_text: '"userName":'
+- name: Musician.social (Mastodon Instance)
+  url: https://musician.social/api/v1/accounts/lookup?acct={username}
+  category: social
+  check_type: content_present
+  success_text: display_name
+- name: musictraveler
+  url: https://www.musictraveler.com/en/users/{username}/
+  category: content
+  check_type: content_present
+  success_text: on Music Traveler</title>
+- name: my_instants
+  url: https://www.myinstants.com/en/profile/{username}/
+  category: content
+  check_type: content_present
+  success_text: ' | Myinstants</title>'
+- name: MyFitnessPal Author
+  url: https://blog.myfitnesspal.com/author/{username}/
+  category: community
+  check_type: content_present
+  success_text: About the Author
+- name: MyFitnessPal Community
+  url: https://community.myfitnesspal.com/en/profile/{username}
+  category: community
+  check_type: content_present
+  success_text: '>Last Active<'
+- name: MyNickname
+  url: https://mynickname.com/en/search?q={username}
+  category: community
+  check_type: content_present
+  success_text: nickname found:</h2>
+- name: myportfolio
+  url: https://{username}.myportfolio.com/work
+  category: community
+  check_type: content_present
+  success_text: class="page-title
+- name: Myspreadshop
+  url: https://myspreadshop.de/{username}/shopData/list
+  category: professional
+  check_type: content_present
+  success_text: siteName
+- name: naija_planet
+  url: https://naijaplanet.com/{username}
+  category: dating
+  check_type: content_present
+  success_text: 'dating Profile, '
+- name: Neocities
+  url: https://neocities.org/site/{username}
+  category: social
+  check_type: content_present
+  success_text: noindex, follow
+- name: netvibes
+  url: https://www.netvibes.com/{username}
+  category: social
+  check_type: content_present
+  success_text: userId
+- name: newmeet
+  url: https://www.newmeet.com/en/profile/{username}/
+  category: dating
+  check_type: content_present
+  success_text: <h2>The profile of
+- name: Nifty Gateway
+  url: https://api.niftygateway.com/user/profile-and-offchain-nifties-by-url/?profile_url={username}
+  category: social
+  check_type: content_present
+  success_text: '&quot;didSucceed&quot;: true'
+- name: nihbuatjajan
+  url: https://www.nihbuatjajan.com/{username}
+  category: social
+  check_type: content_present
+  success_text: ) | Nih buat jajan</title>
+- name: Nitecrew (Mastodon Instance)
+  url: https://nitecrew.rip/api/v1/accounts/lookup?acct={username}
+  category: social
+  check_type: content_present
+  success_text: display_name
+- name: okidoki
+  url: https://m.okidoki.ee/ru/users/{username}/
+  category: community
+  check_type: content_present
+  success_text: Пользователь
+- name: OpenStreetMap Wiki
+  url: https://wiki.openstreetmap.org/w/api.php?action=query&format=json&list=users&ususers={username}
+  category: social
+  check_type: content_present
+  success_text: '"userid":'
+- name: OPGG
+  url: https://eune.op.gg/summoners/eune/{username}
+  category: gaming
+  check_type: content_present
+  success_text: '- Summoner Stats - League of Legends'
+- name: Origins.Habbo.com
+  url: https://origins.habbo.com/api/public/users?name={username}
+  category: gaming
+  check_type: content_present
+  success_text: uniqueId
+- name: Origins.Habbo.com.br
+  url: https://origins.habbo.com.br/api/public/users?name={username}
+  category: gaming
+  check_type: content_present
+  success_text: uniqueId
+- name: Origins.Habbo.es
+  url: https://origins.habbo.es/api/public/users?name={username}
+  category: gaming
+  check_type: content_present
+  success_text: uniqueId
+- name: palnet
+  url: https://www.palnet.io/@{username}/
+  category: social
+  check_type: content_present
+  success_text: class="profile-cover"
+- name: Parler
+  url: https://parler.com/user/{username}
+  category: social
+  check_type: content_present
+  success_text: People to Follow
+- name: Patriots Win
+  url: https://patriots.win/u/{username}/
+  category: community
+  check_type: content_present
+  success_text: nav-user active register
+- name: PCPartPicker
+  url: https://pcpartpicker.com/user/{username}/
+  category: dev
+  check_type: content_present
+  success_text: class="active"
+- name: Peerlist
+  url: https://peerlist.io/api/v1/users/profile/tldr?handle={username}
+  category: dev
+  check_type: content_present
+  success_text: '"tldr":'
+- name: Pillowfort
+  url: https://www.pillowfort.social/{username}/json/?p=1
+  category: social
+  check_type: content_present
+  success_text: '"posts":'
+- name: Playstation Network
+  url: https://psnprofiles.com/xhr/search/users?q={username}
+  category: gaming
+  check_type: content_present
+  success_text: <div class="progress-bar small level">
+- name: Plink
+  url: https://plink.gg/user/{username}
+  category: gaming
+  check_type: content_present
+  success_text: class="user-page"
+- name: Poe.com
+  url: https://poe.com/profile/{username}
+  category: dev
+  check_type: content_present
+  success_text: '"__isNode":"PoeUser"'
+- name: Pokec
+  url: https://pokec.azet.sk/{username}
+  category: social
+  check_type: content_present
+  success_text: idReportedUser
+- name: popl
+  url: https://poplme.co/{username}
+  category: professional
+  check_type: content_present
+  success_text: MuiTypography-root MuiTypography-body1 css-kj7pvm
+- name: postcrossing
+  url: https://www.postcrossing.com/user/{username}
+  category: social
+  check_type: content_present
+  success_text: ', from'
+- name: Poweredbygay.social (Mastodon Instance)
+  url: https://poweredbygay.social/api/v1/accounts/lookup?acct={username}
+  category: social
+  check_type: content_present
+  success_text: display_name
+- name: Pravda.me
+  url: https://pravda.me/@{username}
+  category: social
+  check_type: content_present
+  success_text: Российская социальная сеть (by mastodon)</title>
+- name: Privacy Guides
+  url: https://discuss.privacyguides.net/u/{username}.json
+  category: dev
+  check_type: content_present
+  success_text: assign_path
+- name: Pronouny
+  url: https://pronouny.xyz/api/users/profile/username/{username}
+  category: social
+  check_type: content_present
+  success_text: '"username":'
+- name: Prose
+  url: https://prose.astral.camp/{username}/
+  category: content
+  check_type: content_present
+  success_text: blog-title
+- name: Public.com
+  url: https://public.com/@{username}
+  category: professional
+  check_type: content_present
+  success_text: '"publicId":'
+- name: Raddle.me
+  url: https://raddle.me/user/{username}
+  category: social
+  check_type: content_present
+  success_text: sidebar__title
+- name: Rant.li
+  url: https://rant.li/{username}/
+  category: content
+  check_type: content_present
+  success_text: blog-title
+- name: Refsheet
+  url: https://refsheet.net/{username}
+  category: community
+  check_type: content_present
+  success_text: og:title
+- name: resumes_actorsaccess
+  url: https://resumes.actorsaccess.com/{username}
+  category: social
+  check_type: content_present
+  success_text: '- Resume | Actors Access</title>'
+- name: Revolut
+  url: https://revolut.me/api/web-profile/{username}
+  category: professional
+  check_type: content_present
+  success_text: '"firstName"'
+- name: risk.ru
+  url: https://risk.ru/people/{username}
+  category: community
+  check_type: content_present
+  success_text: — Люди — Risk.ru
+- name: RoutineHub
+  url: https://routinehub.co/user/{username}
+  category: social
+  check_type: content_present
+  success_text: 'Downloads: '
+- name: RubyGems.org
+  url: https://rubygems.org/api/v1/profiles/{username}.json
+  category: dev
+  check_type: content_present
+  success_text: '"id":'
+- name: RuTracker.org
+  url: https://rutracker.org/forum/profile.php?mode=viewprofile&u={username}
+  category: community
+  check_type: content_present
+  success_text: Профиль пользователя
+- name: ruVoIP.net
+  url: https://ruvoip.net/members/{username}/
+  category: dev
+  check_type: content_present
+  success_text: id="user-xprofile"
+- name: Scammer.info
+  url: https://scammer.info/u/{username}.json
+  category: community
+  check_type: content_present
+  success_text: avatar_template
+- name: Scored
+  url: https://scored.co/api/v2/user/about.json?user={username}
+  category: social
+  check_type: content_present
+  success_text: '"status":true'
+- name: Scribd (Document)
+  url: https://www.scribd.com/search/query?query={username}&verbatim=true
+  category: community
+  check_type: content_present
+  success_text: '"compilationId":"'
+- name: Searchengines
+  url: https://searchengines.guru/ru/search?keyword=&author={username}&sortByDate=true
+  category: community
+  check_type: content_present
+  success_text: class="search-result__item"
+- name: secure_donation
+  url: https://secure.donationpay.org/{username}/
+  category: professional
+  check_type: content_present
+  success_text: '| DonationPay</title>'
+- name: sedisp@ce
+  url: https://sedispace.com/@{username}
+  category: social
+  check_type: content_present
+  success_text: Membre depuis -
+- name: sentimente
+  url: https://www.sentimente.com/amp/{username}.html
+  category: dating
+  check_type: content_present
+  success_text: Chat online with
+- name: shopify
+  url: https://{username}.myshopify.com
+  category: professional
+  check_type: content_present
+  success_text: home
+- name: SimplePlanes
+  url: https://www.simpleplanes.com/u/{username}
+  category: gaming
+  check_type: content_present
+  success_text: <h5>joined
+- name: smelsy
+  url: https://www.smelsy.com/profile/{username}
+  category: community
+  check_type: content_present
+  success_text: Smelsy -
+- name: Snipfeed
+  url: https://snipfeed.co/{username}
+  category: community
+  check_type: content_present
+  success_text: creatorLink
+- name: social.bund.de
+  url: https://social.bund.de/@{username}
+  category: social
+  check_type: content_present
+  success_text: '@social.bund.de) - social.bund.de</title>'
+- name: social_msdn
+  url: https://social.msdn.microsoft.com/profile/{username}
+  category: social
+  check_type: content_present
+  success_text: Member Since
+- name: sofurry
+  url: https://{username}.sofurry.com
+  category: content
+  check_type: content_present
+  success_text: '''s Profile | SoFurry'
+- name: solo.to
+  url: https://solo.to/{username}
+  category: social
+  check_type: content_present
+  success_text: create your own page
+- name: speedrun
+  url: https://www.speedrun.com/user/{username}/
+  category: gaming
+  check_type: content_present
+  success_text: 'Runs - '
+- name: SPOJ
+  url: https://www.spoj.com/users/{username}/
+  category: dev
+  check_type: content_present
+  success_text: <h3>Activity over the last year</h3>
+- name: Sports Tracker
+  url: https://api.sports-tracker.com/apiserver/v1/user/name/{username}
+  category: community
+  check_type: content_present
+  success_text: '"uuid":'
+- name: StackShare
+  url: https://stackshare.io/{username}
+  category: dev
+  check_type: content_present
+  success_text: class='user-container'
+- name: Statuspage
+  url: https://{username}.statuspage.io/api/v2/status.json
+  category: dev
+  check_type: content_present
+  success_text: updated_at
+- name: SteamGifts
+  url: https://www.steamgifts.com/user/{username}
+  category: gaming
+  check_type: content_present
+  success_text: '"identifier":'
+- name: StreamElements
+  url: https://api.streamelements.com/kappa/v2/channels/{username}
+  category: professional
+  check_type: content_present
+  success_text: '"providerId"'
+- name: StreamLabs
+  url: https://streamlabs.com/api/v6/user/{username}
+  category: professional
+  check_type: content_present
+  success_text: '"id":'
+- name: tabletoptournament
+  url: https://www.tabletoptournaments.net/eu/player/{username}
+  category: community
+  check_type: content_present
+  success_text: '- Player Profile | T³ - TableTop Tournaments'
+- name: TAPiTAG
+  url: https://account.tapitag.co/tapitag/api/v1/{username}
+  category: professional
+  check_type: content_present
+  success_text: User details are Showing
+- name: Tappy
+  url: https://api.tappy.tech/api/profile/username/{username}
+  category: professional
+  check_type: content_present
+  success_text: user_id
+- name: Taringa
+  url: https://www.taringa.net/{username}
+  category: social
+  check_type: content_present
+  success_text: ' en Taringa!</title>'
+- name: Taringa Archived Profile
+  url: https://archive.org/wayback/available?url=https://www.taringa.net/{username}
+  category: community
+  check_type: content_present
+  success_text: '"archived_snapshots": {"closest"'
+- name: Teamtreehouse
+  url: https://teamtreehouse.com/{username}
+  category: dev
+  check_type: content_present
+  success_text: Member Since
+- name: Teespring
+  url: https://commerce.teespring.com/v1/stores?slug={username}
+  category: professional
+  check_type: content_present
+  success_text: sellerToken
+- name: Tellonym
+  url: https://api.tellonym.me/profiles/name/{username}
+  category: social
+  check_type: content_present
+  success_text: '"id":'
+- name: theguardian
+  url: https://www.theguardian.com/profile/{username}
+  category: content
+  check_type: content_present
+  success_text: <h2 class="dcr-1ln6kec">
+- name: Tilde.zone (Mastodon Instance)
+  url: https://tilde.zone/api/v1/accounts/lookup?acct={username}
+  category: social
+  check_type: content_present
+  success_text: display_name
+- name: TipeeeStream
+  url: https://www.tipeeestream.com/v3.0/pages/{username}
+  category: professional
+  check_type: content_present
+  success_text: '"id":'
+- name: Tooting.ch (Mastodon Instance)
+  url: https://tooting.ch/api/v1/accounts/lookup?acct={username}
+  category: social
+  check_type: content_present
+  success_text: display_name
+- name: toyhou.se
+  url: https://toyhou.se/{username}
+  category: community
+  check_type: content_present
+  success_text: display-user
+- name: TruckersMP
+  url: https://truckersmp.com/user/search?search={username}
+  category: gaming
+  check_type: content_present
+  success_text: class="team-v2"
+- name: Ubisoft
+  url: https://discussions.ubisoft.com/user/{username}
+  category: gaming
+  check_type: content_present
+  success_text: '| Ubisoft Discussion Forums'
+- name: Udemy
+  url: https://www.udemy.com/user/{username}/
+  category: dev
+  check_type: content_present
+  success_text: '| Udemy</title>'
+- name: UEF CONNECT
+  url: https://uefconnect.uef.fi/en/{username}/
+  category: professional
+  check_type: content_present
+  success_text: profile-page-header__info
+- name: Unlisted Videos
+  url: https://unlistedvideos.com/search.php?user={username}
+  category: community
+  check_type: content_present
+  success_text: Date submitted
+- name: utip.io
+  url: https://utip.io/creator/profile/{username}
+  category: professional
+  check_type: content_present
+  success_text: '"userName"'
+- name: uwu.ai
+  url: https://{username}.uwu.ai/
+  category: social
+  check_type: content_present
+  success_text: property="twitter:card"
+- name: Uwumarket
+  url: https://uwumarket.us/collections/{username}
+  category: professional
+  check_type: content_present
+  success_text: collection-hero__text-wrapper
+- name: vibilagare
+  url: https://www.vibilagare.se/users/{username}
+  category: community
+  check_type: content_present
+  success_text: Profil på vibilagare.se
+- name: VIP-blog
+  url: http://{username}.vip-blog.com
+  category: content
+  check_type: content_present
+  success_text: 'blog : '
+- name: visnesscard
+  url: https://my.visnesscard.com/Home/GetCard/{username}
+  category: professional
+  check_type: content_present
+  success_text: end_point
+- name: Vkl.world (Mastodon Instance)
+  url: https://vkl.world/api/v1/accounts/lookup?acct={username}
+  category: social
+  check_type: content_present
+  success_text: display_name
+- name: Vmst.io (Mastodon Instance)
+  url: https://vmst.io/api/v1/accounts/lookup?acct={username}
+  category: social
+  check_type: content_present
+  success_text: display_name
+- name: Voices.com
+  url: https://www.voices.com/profile/{username}/
+  category: professional
+  check_type: content_present
+  success_text: Last Online</h3>
+- name: Warmerise
+  url: https://warmerise.com/profile/{username}
+  category: gaming
+  check_type: content_present
+  success_text: <div id='profile_photo
+- name: waytohey
+  url: https://waytohey.com/{username}
+  category: social
+  check_type: content_present
+  success_text: Send message</span>
+- name: weheartit
+  url: https://weheartit.com/{username}
+  category: social
+  check_type: content_present
+  success_text: ' on We Heart It</title>'
+- name: WeTransfer
+  url: https://{username}.wetransfer.com
+  category: community
+  check_type: content_present
+  success_text: workspaceName
+- name: Wikimapia
+  url: https://wikimapia.org/user/register/?check=username&value={username}
+  category: social
+  check_type: content_present
+  success_text: '"ok":false'
+- name: WordPress.com (Deleted)
+  url: https://public-api.wordpress.com/rest/v1.1/sites/{username}.wordpress.com
+  category: content
+  check_type: content_present
+  success_text: '"message":"API calls to this endpoint have been disabled."'
+- name: WordPress.org (Forums)
+  url: https://login.wordpress.org/wp-json/wporg/v1/username-available/{username}
+  category: content
+  check_type: content_present
+  success_text: '"error":"That username is already in use.'
+- name: X
+  url: https://api.x.com/i/users/username_available.json?username={username}
+  category: social
+  check_type: content_present
+  success_text: '"reason":"taken"'
+- name: Yahoo! JAPAN Auction
+  url: https://auctions.yahoo.co.jp/follow/list/{username}
+  category: professional
+  check_type: content_present
+  success_text: 出品者
+- name: Yazawaj
+  url: https://www.yazawaj.com/profile/{username}
+  category: dating
+  check_type: content_present
+  success_text: profile-description
+- name: YesWeHack
+  url: https://api.yeswehack.com/hunters/{username}
+  category: dev
+  check_type: content_present
+  success_text: '"username":'
+- name: YouTube Channel
+  url: https://www.youtube.com/c/{username}/about
+  category: content
+  check_type: content_present
+  success_text: joinedDateText
+- name: Zenn
+  url: https://zenn.dev/{username}
+  category: dev
+  check_type: content_present
+  success_text: <div class="UserHeader_profileMain__6Itxi">
+- name: Zepeto
+  url: https://gw-napi.zepeto.io/profiles/{username}
+  category: social
+  check_type: content_present
+  success_text: 'zepetoId":'
+- name: zhihu
+  url: https://api.zhihu.com/books/people/{username}/publications?offset=0&limit=5
+  category: social
+  check_type: content_present
+  success_text: '"is_start": true'
+- name: Zillow
+  url: https://www.zillow.com/profile/{username}/
+  category: professional
+  check_type: content_present
+  success_text: '- Real Estate Agent'
+- name: Znanija
+  url: https://znanija.com/graphql/ru?operationName=NickAvailability&query=query%20NickAvailability%28%24nick%3AString%21%29%7BnickAvailability%28nick%3A%24nick%29%7BisAvailable%7D%7D&variables=%7B%22nick%22%3A%22{username}%22%7D
+  category: community
+  check_type: content_present
+  success_text: '"isAvailable":false'
+- name: Zomato
+  url: https://www.zomato.com/{username}/reviews
+  category: social
+  check_type: content_present
+  success_text: Activity</h4>
+- name: Военное обозрение
+  url: https://topwar.ru/user/{username}/
+  category: community
+  check_type: content_present
+  success_text: class="puser-info"
+- name: Чатовка.net
+  url: https://chatovka.net/search?user_nick=+{username}&user_sex_m=on&user_sex_f=on
+  category: social
+  check_type: content_present
+  success_text: href="/user/

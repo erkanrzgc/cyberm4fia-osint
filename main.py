@@ -66,6 +66,26 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--dns", action="store_true", help="DNS record lookup")
     p.add_argument("--subdomain", action="store_true", help="Subdomain enumeration (crt.sh)")
     p.add_argument(
+        "--holehe", action="store_true",
+        help="Probe ~120 sites for each discovered email (requires holehe extra)",
+    )
+    p.add_argument(
+        "--ghunt", action="store_true",
+        help="Resolve Google account from each email (requires `ghunt login` once)",
+    )
+    p.add_argument(
+        "--toutatis", action="store_true",
+        help="Instagram OSINT lookup (set IG_SESSION_ID env for richer data)",
+    )
+    p.add_argument(
+        "--recursive", action="store_true",
+        help="Feed discovered usernames back into the platform sweep",
+    )
+    p.add_argument(
+        "--recursive-depth", dest="recursive_depth", type=int, default=1,
+        help="How many recursion passes to run (default 1)",
+    )
+    p.add_argument(
         "--tor", "-toor", action="store_true",
         help="Route through Tor (socks5://127.0.0.1:9050)",
     )

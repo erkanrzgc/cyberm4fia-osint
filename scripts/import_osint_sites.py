@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
-"""Reverse-engineer Maigret and Sherlock site databases into our platforms.yaml.
+"""Reverse-engineer Maigret, Sherlock and WhatsMyName site databases into platforms.yaml.
 
-Produces modules/platforms.yaml enriched with 1500+ platforms while preserving
+Produces modules/platforms.yaml enriched with 2000+ platforms while preserving
 the curated top entries (deep scrapers, check_type overrides) from the existing
-file.
+file. WhatsMyName is community-maintained and tends to be the freshest source.
 
 Usage:
     python scripts/import_osint_sites.py \\
         --maigret /tmp/osint-src/maigret_data.json \\
         --sherlock /tmp/osint-src/sherlock_data.json \\
+        --wmn /tmp/osint-src/wmn-data.json \\
         --out modules/platforms.yaml
 """
 from __future__ import annotations
@@ -36,6 +37,29 @@ SHERLOCK_ERROR_MAP = {
     "message": "content_absent",
     "response_url": "status",
 }
+
+WMN_CATEGORY_MAP: dict[str, str] = {
+    "social": "social",
+    "gaming": "gaming",
+    "hobby": "community",
+    "tech": "dev",
+    "coding": "dev",
+    "misc": "community",
+    "finance": "professional",
+    "images": "content",
+    "business": "professional",
+    "music": "content",
+    "shopping": "professional",
+    "blog": "content",
+    "art": "content",
+    "health": "community",
+    "dating": "dating",
+    "political": "community",
+    "archived": "community",
+    "video": "content",
+    "news": "content",
+}
+
 
 TAG_CATEGORY_PRIORITY: list[tuple[str, str]] = [
     ("dating", "dating"),
@@ -226,6 +250,51 @@ def _convert_sherlock(data: dict) -> list[OutPlatform]:
     return out
 
 
+def _convert_wmn(data: dict) -> list[OutPlatform]:
+    sites = data.get("sites", [])
+    out: list[OutPlatform] = []
+    for site in sites:
+        if not isinstance(site, dict):
+            continue
+        cat_raw = str(site.get("cat", "")).strip()
+        if "nsfw" in cat_raw.lower():
+            continue
+        name = site.get("name")
+        url = site.get("uri_check")
+        if not (isinstance(name, str) and isinstance(url, str)):
+            continue
+        if "{account}" in url:
+            url = url.replace("{account}", "{username}")
+        if "{username}" not in url:
+            continue
+        e_string = site.get("e_string") or ""
+        m_string = site.get("m_string") or ""
+        if isinstance(e_string, str) and e_string:
+            check_type = "content_present"
+            success_text = e_string
+            error_text = ""
+        elif isinstance(m_string, str) and m_string:
+            check_type = "content_absent"
+            success_text = ""
+            error_text = m_string
+        else:
+            check_type = "status"
+            success_text = ""
+            error_text = ""
+        category = WMN_CATEGORY_MAP.get(cat_raw, "community")
+        out.append(
+            OutPlatform(
+                name=name,
+                url=url,
+                category=category,
+                check_type=check_type,
+                error_text=error_text,
+                success_text=success_text,
+            )
+        )
+    return out
+
+
 def _load_curated() -> tuple[list[dict], dict[str, dict]]:
     raw = yaml.safe_load(CURATED_YAML.read_text(encoding="utf-8"))
     plats = raw.get("platforms", [])
@@ -245,11 +314,15 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--maigret", required=True)
     ap.add_argument("--sherlock", required=True)
+    ap.add_argument("--wmn", default="")
     ap.add_argument("--out", default=str(CURATED_YAML))
     args = ap.parse_args()
 
     maigret = json.loads(Path(args.maigret).read_text(encoding="utf-8"))
     sherlock = json.loads(Path(args.sherlock).read_text(encoding="utf-8"))
+    wmn = (
+        json.loads(Path(args.wmn).read_text(encoding="utf-8")) if args.wmn else None
+    )
 
     curated, curated_by_name = _load_curated()
     curated_url_keys = {_url_key(p["url"]) for p in curated}
@@ -259,8 +332,13 @@ def main() -> None:
 
     for p in _convert_maigret(maigret):
         imported[p.name] = p
+    if wmn is not None:
+        # WhatsMyName often has sharper e_string/m_string — prefer its entries
+        # when a site is present in both, to benefit from community upkeep.
+        for p in _convert_wmn(wmn):
+            imported[p.name] = p
     for p in _convert_sherlock(sherlock):
-        # Sherlock is secondary; don't overwrite Maigret's richer entry.
+        # Sherlock is secondary; don't overwrite Maigret/WMN entries.
         imported.setdefault(p.name, p)
 
     final: list[dict] = list(curated)  # curated always wins, preserves order

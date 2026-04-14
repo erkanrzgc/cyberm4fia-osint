@@ -21,8 +21,16 @@ from core.smart_search import (
     generate_variations,
     merge_discoveries,
 )
-from modules.breach_check import check_many_emails, hibp_available
+from modules.breach_check import breach_check_available, check_many_emails, hibp_available
+from modules.comb_leaks import search_comb_many
 from modules.deep_scrapers import DEEP_SCRAPERS
+from modules.ghunt_lookup import is_available as ghunt_available
+from modules.ghunt_lookup import lookup_emails as ghunt_lookup_emails
+from modules.holehe_check import check_emails as holehe_check_emails
+from modules.holehe_check import is_available as holehe_available
+from modules.holehe_check import module_count as holehe_module_count
+from modules.toutatis_lookup import is_available as toutatis_available
+from modules.toutatis_lookup import lookup_usernames as toutatis_lookup_usernames
 from modules.dns_lookup import enumerate_subdomains, get_dns_records
 from modules.email_discovery import discover_emails
 from modules.fp_filter import score_match
@@ -323,8 +331,9 @@ async def _phase_email_breach(
 
     email_results = await discover_emails(client, cfg.username, known_emails)
 
-    if cfg.breach and hibp_available():
-        console.print("  [bold yellow][5/8][/bold yellow] HIBP breach check...")
+    if cfg.breach and breach_check_available():
+        label = "HIBP + XposedOrNot" if hibp_available() else "XposedOrNot (free)"
+        console.print(f"  [bold yellow][5/8][/bold yellow] Breach check: {label}...")
         # Collect every unique email once, look them up in parallel.
         unique_emails = list({er.email for er in email_results} | set(known_emails))
         breach_map = await check_many_emails(client, unique_emails)
@@ -347,15 +356,87 @@ async def _phase_email_breach(
                         breaches=breaches,
                     )
                 )
-    elif cfg.breach:
-        console.print(
-            "  [dim][5/8] HIBP breach check: skipped (HIBP_API_KEY not set)[/dim]"
-        )
 
     result.emails = email_results
     console.print(
         f"  [bold green][5/8][/bold green] Done: {len(email_results)} emails found"
     )
+
+    # COMB leak lookup: piggyback on the breach phase. Runs when --breach is on.
+    if cfg.breach:
+        queries = list({cfg.username} | {er.email for er in email_results})
+        console.print(
+            f"  [bold yellow][5/8][/bold yellow] COMB leak search ({len(queries)} queries)..."
+        )
+        comb_map = await search_comb_many(client, queries)
+        all_leaks = [leak for leaks in comb_map.values() for leak in leaks]
+        # Dedupe by (identifier, preview) pair.
+        seen_pairs: set[tuple[str, str]] = set()
+        unique: list = []
+        for leak in all_leaks:
+            key = (leak.identifier.lower(), leak.password_preview)
+            if key in seen_pairs:
+                continue
+            seen_pairs.add(key)
+            unique.append(leak)
+        result.comb_leaks = unique
+        console.print(
+            f"  [bold green][5/8][/bold green] COMB: {len(unique)} unique credential leaks"
+        )
+
+    # Holehe: pivot each discovered email into ~120 registration checks.
+    if cfg.holehe and holehe_available():
+        target_emails = list({er.email for er in result.emails})
+        if target_emails:
+            console.print(
+                f"  [bold yellow][5/8][/bold yellow] Holehe: "
+                f"{len(target_emails)} email(s) x {holehe_module_count()} sites..."
+            )
+            holehe_map = await holehe_check_emails(target_emails)
+            all_hits = [h for hits in holehe_map.values() for h in hits]
+            result.holehe_hits = all_hits
+            console.print(
+                f"  [bold green][5/8][/bold green] Holehe: {len(all_hits)} registered accounts"
+            )
+    elif cfg.holehe and not holehe_available():
+        console.print(
+            "  [dim][5/8] Holehe: skipped (install the 'holehe' extra to enable)[/dim]"
+        )
+
+    # GHunt: only when enabled AND the user has logged in once via `ghunt login`.
+    if cfg.ghunt and ghunt_available():
+        target_emails = list({er.email for er in result.emails})
+        if target_emails:
+            console.print(
+                f"  [bold yellow][5/8][/bold yellow] GHunt: "
+                f"{len(target_emails)} email(s) → Google account lookup..."
+            )
+            ghunt_map = await ghunt_lookup_emails(target_emails)
+            result.ghunt_results = list(ghunt_map.values())
+            console.print(
+                f"  [bold green][5/8][/bold green] GHunt: {len(result.ghunt_results)} Google accounts resolved"
+            )
+    elif cfg.ghunt and not ghunt_available():
+        console.print(
+            "  [dim][5/8] GHunt: skipped (run 'ghunt login' once to enable)[/dim]"
+        )
+
+    # Toutatis: pivots on the original username + any pivoted handles.
+    if cfg.toutatis and toutatis_available():
+        ig_handles = list({cfg.username, *result.discovered_usernames})
+        console.print(
+            f"  [bold yellow][5/8][/bold yellow] Toutatis: "
+            f"{len(ig_handles)} Instagram handle(s)..."
+        )
+        tout_map = await toutatis_lookup_usernames(ig_handles)
+        result.toutatis_results = list(tout_map.values())
+        console.print(
+            f"  [bold green][5/8][/bold green] Toutatis: {len(result.toutatis_results)} IG profiles"
+        )
+    elif cfg.toutatis and not toutatis_available():
+        console.print(
+            "  [dim][5/8] Toutatis: skipped (install the 'toutatis' extra to enable)[/dim]"
+        )
 
 
 async def _phase_web_presence(
@@ -412,6 +493,79 @@ async def _phase_dns_subdomain(
     )
 
 
+async def _phase_recursive(
+    client: HTTPClient,
+    cfg: ScanConfig,
+    platforms: list[Platform],
+    result: ScanResult,
+) -> None:
+    """Feed freshly-discovered usernames back into the platform sweep.
+
+    Bounded by ``cfg.recursive_depth``. On each pass we:
+      * gather new candidate usernames from profile data and discovered_usernames
+      * skip anything already seen (the original target and prior passes)
+      * run the full platform check for each candidate, sequentially per pass
+      * merge hits into ``result.platforms`` with a status marking the pivot
+
+    This is the Maigret-style pivot loop, implemented natively so we keep the
+    FP filter, deep scrape, and profile_extract pipeline on the new hits.
+    """
+    if not cfg.recursive or cfg.recursive_depth <= 0:
+        return
+
+    seen: set[str] = {cfg.username.lower()}
+    queue: list[str] = []
+
+    def _harvest() -> None:
+        for r in result.platforms:
+            if not r.exists or not r.profile_data:
+                continue
+            for key in ("username", "nickname", "screen_name", "login"):
+                val = r.profile_data.get(key)
+                if isinstance(val, str) and val and val.lower() not in seen:
+                    seen.add(val.lower())
+                    queue.append(val)
+        for u in result.discovered_usernames:
+            if isinstance(u, str) and u and u.lower() not in seen:
+                seen.add(u.lower())
+                queue.append(u)
+
+    _harvest()
+    if not queue:
+        return
+
+    total_new = 0
+    for depth in range(cfg.recursive_depth):
+        if not queue:
+            break
+        pass_queue = list(queue)
+        queue.clear()
+        console.print(
+            f"  [bold yellow][+][/bold yellow] Recursive pass {depth + 1}/"
+            f"{cfg.recursive_depth}: probing {len(pass_queue)} pivoted username(s)"
+        )
+        for candidate in pass_queue:
+            tasks = [_check_platform(client, candidate, p) for p in platforms]
+            new_results = await asyncio.gather(*tasks)
+            for r in new_results:
+                if (
+                    r.exists
+                    and r.platform not in DEEP_SCRAPERS
+                    and r.confidence < cfg.fp_threshold
+                ):
+                    r.exists = False
+                    r.status = "low_confidence"
+                if r.exists:
+                    r.status = f"found (pivot:{candidate})"
+                    result.platforms.append(r)
+                    total_new += 1
+        _harvest()
+
+    console.print(
+        f"  [bold green][+][/bold green] Recursive: {total_new} additional profiles"
+    )
+
+
 def _finalize_cross_reference(result: ScanResult) -> None:
     found = [r for r in result.platforms if r.exists]
     cr = cross_reference(found)
@@ -450,6 +604,7 @@ async def run_scan(cfg: ScanConfig) -> ScanResult:
         await _phase_web_presence(client, cfg, platform_results, result)
         await _phase_whois(cfg, result)
         await _phase_dns_subdomain(client, cfg, result)
+        await _phase_recursive(client, cfg, platforms, result)
 
     _finalize_cross_reference(result)
     result.scan_time = time.monotonic() - start_time

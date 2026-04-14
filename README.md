@@ -10,9 +10,9 @@
                     Open Source Intelligence by cyberm4fia
 ```
 
-A terminal-first OSINT username reconnaissance framework. `cyberm4fia-osint` hunts a single username across **1,600+ platforms** — social, dating, dev, gaming, professional, community forums, and more — then enriches the findings with deep profile scraping, cross-referencing, breach checks, WHOIS, DNS, subdomain enumeration, and an optional **local LLM analyst** (Cisco Foundation-Sec-8B) that writes a cybersecurity-aware report on the target.
+A terminal-first OSINT username reconnaissance framework. `cyberm4fia-osint` hunts a single username across **1,900+ platforms** — social, dating, dev, gaming, professional, community forums, and more — then enriches the findings with deep profile scraping, cross-referencing, breach checks, WHOIS, DNS, subdomain enumeration, recursive pivot discovery, and an optional **local LLM analyst** (Cisco Foundation-Sec-8B) that writes a cybersecurity-aware report on the target.
 
-The platform database is reverse-engineered from [Maigret](https://github.com/soxoj/maigret) and [Sherlock](https://github.com/sherlock-project/sherlock) — their site rules (check types, error strings, headers) are ported directly into our native YAML schema, not wrapped as a subprocess.
+The platform database is reverse-engineered from [Maigret](https://github.com/soxoj/maigret), [Sherlock](https://github.com/sherlock-project/sherlock), and [WhatsMyName](https://github.com/WebBreacher/WhatsMyName) — their site rules (check types, error strings, headers) are ported directly into our native YAML schema, not wrapped as a subprocess. Email-side intelligence is powered by native ports of [Holehe](https://github.com/megadose/holehe) (120+ site registration probes), [GHunt](https://github.com/mxrch/GHunt) (Google account lookup), and [Toutatis](https://github.com/megadose/toutatis) (Instagram OSINT).
 
 No parameters. No tuning. Just:
 
@@ -24,13 +24,17 @@ cyberm4fia <username>
 
 ## Features
 
-- **1,600+ platforms** checked in parallel (social, dating, dev, gaming, content, professional, community)
+- **1,900+ platforms** checked in parallel (Maigret + Sherlock + WhatsMyName, all native)
 - **Zero-flag full scan** by default — everything on unless you opt out with `--quick`
 - **Deep profile scraping** for GitHub, GitLab, Reddit, Steam, Chess.com, Lichess, Keybase, Hacker News, Dev.to, and more
 - **Opportunistic profile parsing** — pulls names, emails, locations, and linked accounts out of any HTML we fetched, using the upstream `socid-extractor` scheme database (200+ sites, optional install)
 - **Cross-reference engine** with confidence scoring across names, locations, and profile photos
 - **Smart search** — generates username variations and discovers linked accounts from scraped bios
-- **Email discovery** + Gravatar detection + HIBP breach lookup
+- **Email discovery** + Gravatar detection + HIBP / XposedOrNot breach lookup + ProxyNova COMB credential leaks
+- **Holehe** — pivot any discovered email through 120+ site registration probes (`--holehe`)
+- **GHunt** — resolve emails to Google accounts (Gaia ID, name, services) (`--ghunt`)
+- **Toutatis** — Instagram profile OSINT, optional `IG_SESSION_ID` for richer data (`--toutatis`)
+- **Recursive pivot discovery** — usernames found inside profile data are fed back into the platform sweep (`--recursive`, Maigret-style)
 - **Profile photo matching** via perceptual hashing
 - **WHOIS / DNS / subdomain enumeration** (crt.sh)
 - **Wayback Machine** and paste-site presence
@@ -60,11 +64,14 @@ After the editable install, the `cyberm4fia` command is available on your `$PATH
 Optional extras:
 
 ```bash
-pip install -e '.[ai]'       # local LLM via llama-cpp-python
-pip install -e '.[photo]'    # profile photo hashing (Pillow, imagehash)
-pip install -e '.[extract]'  # socid-extractor — auto-parse 200+ profile pages
-pip install -e '.[proxy]'    # SOCKS / Tor support (aiohttp-socks)
-pip install -e '.[dev]'      # pytest, ruff, mypy, coverage
+pip install -e '.[ai]'        # local LLM via llama-cpp-python
+pip install -e '.[photo]'     # profile photo hashing (Pillow, imagehash)
+pip install -e '.[extract]'   # socid-extractor — auto-parse 200+ profile pages
+pip install -e '.[holehe]'    # 120+ site email registration probes
+pip install -e '.[ghunt]'     # Google account lookup (run `ghunt login` once after install)
+pip install -e '.[toutatis]'  # Instagram profile OSINT
+pip install -e '.[socks]'     # SOCKS / Tor support (aiohttp-socks)
+pip install -e '.[dev]'       # pytest, ruff, mypy, coverage
 ```
 
 ---
@@ -166,7 +173,12 @@ cyberm4fia johndoe --ai
 | `--smart` | `-s` | Username variations + discovered linked accounts |
 | `--deep` / `--no-deep` | `-d` | Deep profile scraping (default: on) |
 | `--email` | `-e` | Email discovery + Gravatar |
-| `--breach` / `--hibp` | — | HIBP breach lookup (auto-enables `--email`) |
+| `--breach` / `--hibp` | — | HIBP + XposedOrNot + COMB breach lookup (auto-enables `--email`) |
+| `--holehe` | — | Probe ~120 sites for each discovered email (requires `[holehe]` extra) |
+| `--ghunt` | — | Google account lookup for each email (requires `[ghunt]` extra + `ghunt login`) |
+| `--toutatis` | — | Instagram OSINT for the username (requires `[toutatis]` extra; set `IG_SESSION_ID` for richer data) |
+| `--recursive` | — | Feed discovered usernames back into the platform sweep |
+| `--recursive-depth N` | — | Recursive pivot depth (default `1`) |
 | `--photo` | — | Profile photo perceptual-hash comparison |
 | `--web` | `-w` | Wayback / paste / domain presence |
 | `--whois` | — | WHOIS across 9 TLDs |
@@ -187,7 +199,7 @@ cyberm4fia johndoe --ai
 
 ## Platform Coverage
 
-**1,600+ platforms** across seven categories. Highlights:
+**1,900+ platforms** across seven categories (curated core + Maigret + Sherlock + WhatsMyName imports). Highlights:
 
 - **Social:** Instagram, X / Twitter, TikTok, Facebook, Snapchat, Threads, Bluesky, Mastodon, Reddit, Tumblr, VK, Telegram, Weibo, MySpace, Gab, Truth Social, Flipboard, Matrix, Clubhouse, Quora, Pinterest, Ask.fm, Badoo
 - **Dating:** Tinder, Badoo, MeetMe, Mamba, Hily, Tagged
