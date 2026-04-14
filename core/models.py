@@ -11,6 +11,8 @@ class PlatformResult:
     response_time: float = 0.0
     profile_data: dict = field(default_factory=dict)
     http_status: int = 0
+    confidence: float = 0.0  # 0.0-1.0, FP filter signal
+    fp_signals: list = field(default_factory=list)
 
 
 @dataclass

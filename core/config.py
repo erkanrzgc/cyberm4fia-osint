@@ -76,6 +76,7 @@ class ScanConfig:
     tor: bool = False
     categories: tuple[str, ...] | None = None
     request_timeout: int = REQUEST_TIMEOUT
+    fp_threshold: float = 0.45  # drop matches below this confidence
 
     @classmethod
     def from_args(cls, args, username: str) -> ScanConfig:
@@ -119,6 +120,7 @@ class ScanConfig:
             tor=args.tor,
             categories=categories,
             request_timeout=args.timeout or REQUEST_TIMEOUT,
+            fp_threshold=getattr(args, "fp_threshold", None) or 0.45,
         )
 
     def mode_parts(self) -> list[str]:

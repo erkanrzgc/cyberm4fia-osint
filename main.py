@@ -76,6 +76,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--timeout", "-t", type=int, default=None, help="Request timeout (seconds)")
     p.add_argument(
+        "--fp-threshold",
+        dest="fp_threshold",
+        type=float,
+        default=None,
+        help="Drop platform matches below this confidence score (default 0.45)",
+    )
+    p.add_argument(
         "--log-level", default=None,
         help="Diagnostic log level (DEBUG, INFO, WARNING, ERROR)",
     )

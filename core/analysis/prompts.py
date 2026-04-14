@@ -5,33 +5,53 @@ from __future__ import annotations
 import json
 from typing import Any
 
-SYSTEM_PROMPT = """You are an OSINT analyst assistant. You receive the JSON output of
-an automated username reconnaissance scan. Your job is to:
+SYSTEM_PROMPT = """You are a senior OSINT / threat-intelligence analyst. You receive the
+JSON output of an automated username reconnaissance scan and must produce a
+structured briefing suitable for a SOC or investigator.
 
-1. Summarize who the target likely is — names, locations, languages, apparent profession.
-2. Identify the STRONGEST identity linkage signals across platforms (matching bios,
-   avatars, display names, cross-linked accounts, shared emails).
-3. Flag any high-priority exposures: breached credentials, leaked emails, exposed
-   domains, geolocation hints, OPSEC mistakes.
-4. Recommend 3-5 concrete NEXT investigative steps (specific platforms/queries to run
-   next, not generic advice).
+Your objectives:
+
+1. IDENTITY — Who is the target, to the extent the data supports?
+   Pull names, locations, languages, apparent profession, timezone/activity hints,
+   and age/tenure signals from bios, join dates, and post counts.
+
+2. LINKAGE — Which signals most strongly tie the observed accounts to one person?
+   Rank by strength: shared email > shared avatar hash > identical bio/name on
+   multiple platforms > cross-referenced username > location/timezone overlap.
+   Cite the platforms that contributed each signal.
+
+3. EXPOSURE — Threat-model the footprint for the subject's OPSEC:
+   * HIGH: breached credentials, leaked real names on pseudonymous accounts,
+     resolvable home location, exposed email + username reuse enabling
+     credential stuffing, long-lived account reuse across NSFW/anon contexts.
+   * MED: predictable username patterns, publicly indexed resume/CV material,
+     personal email on professional site, photo reuse across contexts.
+   * LOW: minor metadata leaks, third-party tagging, bio overshares.
+
+4. NEXT STEPS — 3-5 concrete, runnable investigative follow-ups (specific
+   platforms, queries, dorks, reverse-image searches). No generic advice.
 
 Rules:
-- Work ONLY from the data you are given. Do NOT invent platforms, URLs, breaches, or
-  facts that are not present in the JSON.
-- Write terse, factual bullet points. No fluff, no disclaimers, no hedging.
-- Output MUST be valid JSON matching the schema in the user message. No prose outside
-  the JSON object.
-- If a field has no data, return an empty list or empty string — do not omit keys.
-- Respond in the same language the scan appears to target; default to English.
+- Work ONLY from the supplied JSON. NEVER invent platforms, URLs, breaches,
+  or facts. If a field is empty, treat it as unknown.
+- A match with low `confidence` (< 0.6) or only a "size" FP signal is weak —
+  discount or exclude it from strong_linkages.
+- Prefer terse, factual bullets. No disclaimers, no hedging, no apologies.
+- Output MUST be valid JSON matching the schema in the user message. No prose
+  outside the JSON object. No markdown fences.
+- Never omit a schema key; use empty string or empty list when you have nothing.
+- Respond in the same language the scan clearly targets; default to English.
 """
 
 
 OUTPUT_SCHEMA = {
-    "identity_summary": "str — 1-3 sentence profile",
-    "strong_linkages": ["str — each: platform(s) + linking signal"],
-    "exposures": ["str — each: prioritized risk (HIGH/MED/LOW) + evidence"],
-    "next_steps": ["str — specific actionable query/lookup"],
+    "identity_summary": "str — 1-3 sentence profile of the subject",
+    "likely_names": ["str — real names or persistent aliases with source platform"],
+    "likely_locations": ["str — city/country/timezone with source platform"],
+    "strong_linkages": ["str — each: platform(s) + specific linking signal"],
+    "exposures": ["str — each: HIGH/MED/LOW prefix + concrete evidence"],
+    "credential_risk": "str — none|low|medium|high, based on breach data + reuse",
+    "next_steps": ["str — specific platform/query/dork to run next"],
     "confidence": "int — 0..100 overall identity-match confidence",
 }
 
@@ -55,6 +75,8 @@ def _trim_payload(payload: dict[str, Any]) -> dict[str, Any]:
             "platform": p.get("platform"),
             "url": p.get("url"),
             "category": p.get("category"),
+            "confidence": round(p.get("confidence", 0.0), 2),
+            "fp_signals": p.get("fp_signals", []),
             "profile_data": _trim_profile(p.get("profile_data") or {}),
         }
         for p in payload.get("platforms", [])
@@ -83,17 +105,23 @@ def _trim_payload(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 _KEEP_PROFILE_KEYS = {
-    "name",
-    "bio",
-    "location",
-    "email",
-    "company",
-    "blog",
-    "twitter_username",
-    "followers",
-    "public_repos",
-    "created_at",
-    "avatar_url",
+    # identity
+    "name", "fullname", "nickname", "first_name", "last_name", "real_name",
+    # bio / self-description
+    "bio", "description", "about", "status",
+    # location
+    "location", "country", "city", "timezone", "language",
+    # contact / linked
+    "email", "website", "blog", "links", "twitter_username", "github_username",
+    # professional
+    "company", "occupation", "job", "title",
+    # activity / tenure
+    "followers", "following", "posts", "public_repos", "karma",
+    "created_at", "joined", "last_seen",
+    # visual
+    "avatar_url", "avatar", "profile_image", "image",
+    # demographics
+    "gender", "birthday", "age",
 }
 
 

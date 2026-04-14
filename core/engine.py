@@ -25,6 +25,7 @@ from modules.breach_check import check_many_emails, hibp_available
 from modules.deep_scrapers import DEEP_SCRAPERS
 from modules.dns_lookup import enumerate_subdomains, get_dns_records
 from modules.email_discovery import discover_emails
+from modules.fp_filter import score_match
 from modules.photo_compare import compare_profile_photos
 from modules.platforms import PLATFORMS, Platform
 from modules.profile_extract import extract_profile, is_available as _extract_available
@@ -80,6 +81,17 @@ async def _check_platform(
                 extracted = extract_profile(body)
                 if extracted:
                     result.profile_data = extracted
+
+            # False-positive scoring on any positive match.
+            if result.exists and body:
+                fp = score_match(
+                    username=username,
+                    body=body,
+                    check_type=platform.check_type,
+                    http_status=status,
+                )
+                result.confidence = fp.confidence
+                result.fp_signals = list(fp.signals)
 
         result.status = _status_from_http(status, result.exists)
     except (asyncio.TimeoutError, OSError) as exc:
@@ -143,10 +155,25 @@ async def _phase_platform_check(
     console.print("  [bold yellow][1/8][/bold yellow] Starting platform sweep...")
     tasks = [_check_platform(client, cfg.username, p) for p in platforms]
     platform_results = await asyncio.gather(*tasks)
+
+    # Deep-scraped platforms are hand-curated and verified via API calls,
+    # so we trust them regardless of the heuristic confidence score.
+    dropped = 0
+    for r in platform_results:
+        if (
+            r.exists
+            and r.platform not in DEEP_SCRAPERS
+            and r.confidence < cfg.fp_threshold
+        ):
+            r.exists = False
+            r.status = "low_confidence"
+            dropped += 1
+
     found_count = sum(1 for r in platform_results if r.exists)
+    suffix = f", [yellow]{dropped}[/yellow] dropped by FP filter" if dropped else ""
     console.print(
         f"  [bold green][1/8][/bold green] Done: "
-        f"[green]{found_count}[/green]/{len(platform_results)} platforms matched"
+        f"[green]{found_count}[/green]/{len(platform_results)} platforms matched{suffix}"
     )
     result.platforms = list(platform_results)
     return platform_results
