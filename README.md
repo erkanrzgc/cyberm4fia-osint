@@ -271,5 +271,5 @@ This tool queries **public** profile endpoints — the same information anyone c
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+This project is licensed under the MIT License. See the LICENSE file for more details. Check --> [LICENSE](LICENSE).
 
