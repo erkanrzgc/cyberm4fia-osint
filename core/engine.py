@@ -27,6 +27,7 @@ from modules.dns_lookup import enumerate_subdomains, get_dns_records
 from modules.email_discovery import discover_emails
 from modules.photo_compare import compare_profile_photos
 from modules.platforms import PLATFORMS, Platform
+from modules.profile_extract import extract_profile, is_available as _extract_available
 from modules.web_presence import discover_web_presence
 from modules.whois_lookup import check_username_domains
 
@@ -72,6 +73,13 @@ async def _check_platform(
                 result.exists = status == 200 and platform.error_text not in body
             elif platform.check_type == "content_present":
                 result.exists = status == 200 and platform.success_text in body
+
+            # Opportunistic profile parsing: if the upstream socid_extractor
+            # recognises this HTML, pull out names/emails/links for free.
+            if result.exists and body and _extract_available():
+                extracted = extract_profile(body)
+                if extracted:
+                    result.profile_data = extracted
 
         result.status = _status_from_http(status, result.exists)
     except (asyncio.TimeoutError, OSError) as exc:
@@ -168,7 +176,9 @@ async def _phase_deep_scrape(
     )
     for target, data in zip(targets, deep_results, strict=True):
         if data:
-            target.profile_data = data
+            # Deep scraper output wins over opportunistic extractor output.
+            merged = {**(target.profile_data or {}), **data}
+            target.profile_data = merged
 
     scraped = sum(1 for d in deep_results if d)
     console.print(f"  [bold green][2/8][/bold green] Done: {scraped} profile details pulled")

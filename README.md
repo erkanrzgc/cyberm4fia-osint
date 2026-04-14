@@ -27,6 +27,7 @@ cyberm4fia <username>
 - **1,600+ platforms** checked in parallel (social, dating, dev, gaming, content, professional, community)
 - **Zero-flag full scan** by default — everything on unless you opt out with `--quick`
 - **Deep profile scraping** for GitHub, GitLab, Reddit, Steam, Chess.com, Lichess, Keybase, Hacker News, Dev.to, and more
+- **Opportunistic profile parsing** — pulls names, emails, locations, and linked accounts out of any HTML we fetched, using the upstream `socid-extractor` scheme database (200+ sites, optional install)
 - **Cross-reference engine** with confidence scoring across names, locations, and profile photos
 - **Smart search** — generates username variations and discovers linked accounts from scraped bios
 - **Email discovery** + Gravatar detection + HIBP breach lookup
@@ -59,10 +60,11 @@ After the editable install, the `cyberm4fia` command is available on your `$PATH
 Optional extras:
 
 ```bash
-pip install -e '.[ai]'     # local LLM via llama-cpp-python
-pip install -e '.[photo]'  # profile photo hashing (Pillow, imagehash)
-pip install -e '.[proxy]'  # SOCKS / Tor support (aiohttp-socks)
-pip install -e '.[dev]'    # pytest, ruff, mypy, coverage
+pip install -e '.[ai]'       # local LLM via llama-cpp-python
+pip install -e '.[photo]'    # profile photo hashing (Pillow, imagehash)
+pip install -e '.[extract]'  # socid-extractor — auto-parse 200+ profile pages
+pip install -e '.[proxy]'    # SOCKS / Tor support (aiohttp-socks)
+pip install -e '.[dev]'      # pytest, ruff, mypy, coverage
 ```
 
 ---

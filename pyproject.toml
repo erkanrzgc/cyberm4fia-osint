@@ -33,6 +33,7 @@ socks = ["aiohttp-socks>=0.8.0"]
 whois = ["python-whois>=0.9.0"]
 photo = ["Pillow>=10.0.0", "imagehash>=4.3.0"]
 dns = ["dnspython>=2.4.0"]
+extract = ["socid-extractor>=0.0.25"]
 ai = [
     "llama-cpp-python>=0.3.0",
     "huggingface_hub>=0.24.0",
@@ -43,6 +44,7 @@ all = [
     "Pillow>=10.0.0",
     "imagehash>=4.3.0",
     "dnspython>=2.4.0",
+    "socid-extractor>=0.0.25",
     "llama-cpp-python>=0.3.0",
     "huggingface_hub>=0.24.0",
 ]
