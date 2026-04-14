@@ -10,9 +10,9 @@
                     Open Source Intelligence by cyberm4fia
 ```
 
-A terminal-first OSINT username reconnaissance framework. `cyberm4fia-osint` hunts a single username across **1,900+ platforms** — social, dating, dev, gaming, professional, community forums, and more — then enriches the findings with deep profile scraping, cross-referencing, breach checks, WHOIS, DNS, subdomain enumeration, recursive pivot discovery, and an optional **local LLM analyst** (Cisco Foundation-Sec-8B) that writes a cybersecurity-aware report on the target.
+A terminal-first OSINT username reconnaissance framework. `cyberm4fia-osint` hunts a single username across **1,900+ platforms** — social, dating, dev, gaming, professional, community forums, and more — then enriches the findings with deep profile scraping, cross-referencing, breach checks, WHOIS, DNS, subdomain enumeration, recursive pivot discovery, and an optional **local LLM analyst** that writes a cybersecurity-aware report on the target.
 
-The platform database is reverse-engineered from [Maigret](https://github.com/soxoj/maigret), [Sherlock](https://github.com/sherlock-project/sherlock), and [WhatsMyName](https://github.com/WebBreacher/WhatsMyName) — their site rules (check types, error strings, headers) are ported directly into our native YAML schema, not wrapped as a subprocess. Email-side intelligence is powered by native ports of [Holehe](https://github.com/megadose/holehe) (120+ site registration probes), [GHunt](https://github.com/mxrch/GHunt) (Google account lookup), and [Toutatis](https://github.com/megadose/toutatis) (Instagram OSINT).
+Every check, profile parser, and email-side enrichment is implemented natively in Python — no subprocess wrappers, no external CLIs to install.
 
 No parameters. No tuning. Just:
 
@@ -24,17 +24,17 @@ cyberm4fia <username>
 
 ## Features
 
-- **1,900+ platforms** checked in parallel (Maigret + Sherlock + WhatsMyName, all native)
+- **1,900+ platforms** checked in parallel
 - **Zero-flag full scan** by default — everything on unless you opt out with `--quick`
 - **Deep profile scraping** for GitHub, GitLab, Reddit, Steam, Chess.com, Lichess, Keybase, Hacker News, Dev.to, and more
-- **Opportunistic profile parsing** — pulls names, emails, locations, and linked accounts out of any HTML we fetched, using the upstream `socid-extractor` scheme database (200+ sites, optional install)
+- **Opportunistic profile parsing** — pulls names, emails, locations, and linked accounts out of any HTML we fetched (200+ site schemes, optional install)
 - **Cross-reference engine** with confidence scoring across names, locations, and profile photos
 - **Smart search** — generates username variations and discovers linked accounts from scraped bios
-- **Email discovery** + Gravatar detection + HIBP / XposedOrNot breach lookup + ProxyNova COMB credential leaks
-- **Holehe** — pivot any discovered email through 120+ site registration probes (`--holehe`)
-- **GHunt** — resolve emails to Google accounts (Gaia ID, name, services) (`--ghunt`)
-- **Toutatis** — Instagram profile OSINT, optional `IG_SESSION_ID` for richer data (`--toutatis`)
-- **Recursive pivot discovery** — usernames found inside profile data are fed back into the platform sweep (`--recursive`, Maigret-style)
+- **Email discovery** + Gravatar detection + free breach lookup + public credential-leak search
+- **Email → site enumeration** — pivot any discovered email through 120+ site registration probes (`--holehe`)
+- **Google account lookup** — resolve emails to Google accounts (Gaia ID, name, services) (`--ghunt`)
+- **Instagram profile OSINT** — optional `IG_SESSION_ID` for richer data (`--toutatis`)
+- **Recursive pivot discovery** — usernames found inside profile data are fed back into the platform sweep (`--recursive`)
 - **Profile photo matching** via perceptual hashing
 - **WHOIS / DNS / subdomain enumeration** (crt.sh)
 - **Wayback Machine** and paste-site presence
@@ -120,7 +120,7 @@ cyberm4fia johndoe --diff
 
 `cyberm4fia` ships with an optional local-LLM analyst. It takes the structured scan result and generates a concise cybersecurity report: identity summary, strong linkages, exposures, and next steps — all as JSON, parsed and displayed inline.
 
-**Recommended model:** [Foundation-Sec-1.1-8B-Instruct](https://huggingface.co/fdtn-ai/Foundation-Sec-1.1-8B-Instruct-Q4_K_M-GGUF) — Cisco's cybersecurity-tuned Llama 3.1 fine-tune. Q4_K_M is ~4.92 GB and runs fully GPU-offloaded on an 8 GB card.
+Bring your own model — any cybersecurity-tuned 7B/8B GGUF that fits on an 8 GB GPU works well. The default loader points at a Q4_K_M quant.
 
 ### Option A — LM Studio / OpenAI-compatible HTTP (default)
 
@@ -130,7 +130,7 @@ cyberm4fia johndoe --diff
 
 ```bash
 export CYBERM4FIA_LLM_URL="http://<host-ip>:1234/v1/chat/completions"
-export CYBERM4FIA_LLM_MODEL="foundation-sec-1.1-8b-instruct"
+export CYBERM4FIA_LLM_MODEL="<your-loaded-model-id>"
 cyberm4fia johndoe --ai
 ```
 
@@ -154,8 +154,8 @@ cyberm4fia johndoe --ai
 | `CYBERM4FIA_LLM_MODEL` | `""` | Model ID for the HTTP request |
 | `CYBERM4FIA_LLM_API_KEY` | `lm-studio` | Bearer token |
 | `CYBERM4FIA_LLM_TIMEOUT` | `120` | HTTP timeout (seconds) |
-| `CYBERM4FIA_LLM_REPO` | `fdtn-ai/Foundation-Sec-1.1-8B-Instruct-Q4_K_M-GGUF` | HF repo for `llama_cpp` backend |
-| `CYBERM4FIA_LLM_FILE` | `foundation-sec-1.1-8b-instruct-q4_k_m.gguf` | GGUF filename |
+| `CYBERM4FIA_LLM_REPO` | _(your HF repo)_ | HF repo for `llama_cpp` backend |
+| `CYBERM4FIA_LLM_FILE` | _(your GGUF file)_ | GGUF filename |
 | `CYBERM4FIA_LLM_CTX` | `4096` | Context window |
 | `CYBERM4FIA_LLM_MAX_TOKENS` | `768` | Max output tokens |
 | `CYBERM4FIA_LLM_TEMPERATURE` | `0.2` | Sampling temperature |
@@ -173,7 +173,7 @@ cyberm4fia johndoe --ai
 | `--smart` | `-s` | Username variations + discovered linked accounts |
 | `--deep` / `--no-deep` | `-d` | Deep profile scraping (default: on) |
 | `--email` | `-e` | Email discovery + Gravatar |
-| `--breach` / `--hibp` | — | HIBP + XposedOrNot + COMB breach lookup (auto-enables `--email`) |
+| `--breach` | — | Free breach lookup + public credential-leak search (auto-enables `--email`) |
 | `--holehe` | — | Probe ~120 sites for each discovered email (requires `[holehe]` extra) |
 | `--ghunt` | — | Google account lookup for each email (requires `[ghunt]` extra + `ghunt login`) |
 | `--toutatis` | — | Instagram OSINT for the username (requires `[toutatis]` extra; set `IG_SESSION_ID` for richer data) |
@@ -199,7 +199,7 @@ cyberm4fia johndoe --ai
 
 ## Platform Coverage
 
-**1,900+ platforms** across seven categories (curated core + Maigret + Sherlock + WhatsMyName imports). Highlights:
+**1,900+ platforms** across seven categories. Highlights:
 
 - **Social:** Instagram, X / Twitter, TikTok, Facebook, Snapchat, Threads, Bluesky, Mastodon, Reddit, Tumblr, VK, Telegram, Weibo, MySpace, Gab, Truth Social, Flipboard, Matrix, Clubhouse, Quora, Pinterest, Ask.fm, Badoo
 - **Dating:** Tinder, Badoo, MeetMe, Mamba, Hily, Tagged
@@ -273,11 +273,3 @@ This tool queries **public** profile endpoints — the same information anyone c
 
 MIT — see [LICENSE](LICENSE).
 
----
-
-## Acknowledgements
-
-- [Cisco Foundation AI](https://huggingface.co/fdtn-ai) for the Foundation-Sec cybersecurity LLM
-- [Have I Been Pwned](https://haveibeenpwned.com) for breach data
-- [crt.sh](https://crt.sh) for certificate transparency
-- The OSINT community — this project stands on a mountain of prior work
