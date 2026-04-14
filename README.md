@@ -10,7 +10,9 @@
                     Open Source Intelligence by cyberm4fia
 ```
 
-A terminal-first OSINT username reconnaissance framework. `cyberm4fia-osint` hunts a single username across **116+ platforms** — social, dating, dev, gaming, professional, and more — then enriches the findings with deep profile scraping, cross-referencing, breach checks, WHOIS, DNS, subdomain enumeration, and an optional **local LLM analyst** (Cisco Foundation-Sec-8B) that writes a cybersecurity-aware report on the target.
+A terminal-first OSINT username reconnaissance framework. `cyberm4fia-osint` hunts a single username across **1,600+ platforms** — social, dating, dev, gaming, professional, community forums, and more — then enriches the findings with deep profile scraping, cross-referencing, breach checks, WHOIS, DNS, subdomain enumeration, and an optional **local LLM analyst** (Cisco Foundation-Sec-8B) that writes a cybersecurity-aware report on the target.
+
+The platform database is reverse-engineered from [Maigret](https://github.com/soxoj/maigret) and [Sherlock](https://github.com/sherlock-project/sherlock) — their site rules (check types, error strings, headers) are ported directly into our native YAML schema, not wrapped as a subprocess.
 
 No parameters. No tuning. Just:
 
@@ -22,7 +24,7 @@ cyberm4fia <username>
 
 ## Features
 
-- **116+ platforms** checked in parallel (social, dating, dev, gaming, content, professional, community)
+- **1,600+ platforms** checked in parallel (social, dating, dev, gaming, content, professional, community)
 - **Zero-flag full scan** by default — everything on unless you opt out with `--quick`
 - **Deep profile scraping** for GitHub, GitLab, Reddit, Steam, Chess.com, Lichess, Keybase, Hacker News, Dev.to, and more
 - **Cross-reference engine** with confidence scoring across names, locations, and profile photos
@@ -183,7 +185,7 @@ cyberm4fia johndoe --ai
 
 ## Platform Coverage
 
-**116+ platforms** across seven categories. Highlights:
+**1,600+ platforms** across seven categories. Highlights:
 
 - **Social:** Instagram, X / Twitter, TikTok, Facebook, Snapchat, Threads, Bluesky, Mastodon, Reddit, Tumblr, VK, Telegram, Weibo, MySpace, Gab, Truth Social, Flipboard, Matrix, Clubhouse, Quora, Pinterest, Ask.fm, Badoo
 - **Dating:** Tinder, Badoo, MeetMe, Mamba, Hily, Tagged
