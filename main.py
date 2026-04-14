@@ -31,61 +31,69 @@ log = get_logger(__name__)
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="cyberm4fia-osint",
-        description="OSINT istihbarat toplama araci",
+        description="OSINT intelligence gathering tool",
     )
-    p.add_argument("username", help="Aranacak kullanici adi")
+    p.add_argument("username", help="Username to search for")
     p.add_argument(
         "--smart", "-s", action="store_true",
-        help="Akilli arama: username varyasyonlari + kesfedilen hesaplar",
+        help="Smart search: username variations + discovered accounts",
     )
     p.add_argument(
         "--deep", "-d", action="store_true", default=True,
-        help="Derin profil taramasi (varsayilan: acik)",
+        help="Deep profile scraping (default: on)",
     )
-    p.add_argument("--no-deep", action="store_true", help="Derin profil taramasini kapat")
-    p.add_argument("--email", "-e", action="store_true", help="Email kesfetme ve Gravatar kontrolu")
-    p.add_argument("--web", "-w", action="store_true", help="Web varligi taramasi")
+    p.add_argument("--no-deep", action="store_true", help="Disable deep profile scraping")
+    p.add_argument("--email", "-e", action="store_true", help="Email discovery and Gravatar check")
+    p.add_argument("--web", "-w", action="store_true", help="Web presence scan")
     p.add_argument(
         "--full", "-f", action="store_true",
-        help="Tam tarama: deep + smart + email + web + whois + breach + photo + dns + subdomain",
+        help="Full scan (default: already on). Kept for backward compatibility.",
+    )
+    p.add_argument(
+        "--quick", "-q", action="store_true",
+        help="Quick mode: platform sweep only (disables default full scan)",
     )
     p.add_argument(
         "--category", "-c", type=str, default=None,
-        help="Sadece belirli kategoriler (ornek: social,dev,gaming)",
+        help="Restrict to specific categories (example: social,dev,gaming)",
     )
-    p.add_argument("--whois", action="store_true", help="WHOIS sorgulari (9 TLD)")
+    p.add_argument("--whois", action="store_true", help="WHOIS lookups (9 TLDs)")
     p.add_argument(
         "--breach", "--hibp", dest="breach", action="store_true",
-        help="HIBP breach kontrolu (email taramasini etkinlestirir, HIBP_API_KEY gerekli)",
+        help="HIBP breach check (enables email discovery; HIBP_API_KEY required)",
     )
-    p.add_argument("--photo", action="store_true", help="Profil fotograf karsilastirma")
-    p.add_argument("--dns", action="store_true", help="DNS kayit sorgusu")
+    p.add_argument("--photo", action="store_true", help="Profile photo comparison")
+    p.add_argument("--dns", action="store_true", help="DNS record lookup")
     p.add_argument("--subdomain", action="store_true", help="Subdomain enumeration (crt.sh)")
     p.add_argument(
         "--tor", "-toor", action="store_true",
-        help="Tor uzerinden tara (socks5://127.0.0.1:9050)",
+        help="Route through Tor (socks5://127.0.0.1:9050)",
     )
-    p.add_argument("--proxy", type=str, default=None, help="Proxy adresi")
+    p.add_argument("--proxy", type=str, default=None, help="Proxy address")
     p.add_argument(
         "--output", "-o", type=str, default=None,
-        help="Sonuclari dosyaya kaydet (.json veya .html)",
+        help="Save results to file (.json or .html)",
     )
-    p.add_argument("--timeout", "-t", type=int, default=None, help="Istek zaman asimi (saniye)")
+    p.add_argument("--timeout", "-t", type=int, default=None, help="Request timeout (seconds)")
     p.add_argument(
         "--log-level", default=None,
-        help="Diagnostik log seviyesi (DEBUG, INFO, WARNING, ERROR)",
+        help="Diagnostic log level (DEBUG, INFO, WARNING, ERROR)",
     )
     p.add_argument(
         "--history", action="store_true",
-        help="Bu kullanici icin onceki taramalari listele ve cik",
+        help="List prior scans for this username and exit",
     )
     p.add_argument(
         "--diff", action="store_true",
-        help="Taramadan sonra onceki sonucla karsilastir",
+        help="Diff against the previous scan after running",
     )
     p.add_argument(
         "--no-history", action="store_true",
-        help="Bu taramayi gecmise kaydetme",
+        help="Do not persist this scan to history",
+    )
+    p.add_argument(
+        "--ai", action="store_true",
+        help="Analyze scan results with a local LLM (requires a GGUF model)",
     )
     return p
 
@@ -97,25 +105,41 @@ def _fmt_ts(ts: int) -> str:
 def _show_history(username: str) -> None:
     entries = list_scans(username)
     if not entries:
-        console.print(f"  [yellow]'{username}' icin kayitli tarama yok.[/yellow]")
+        console.print(f"  [yellow]No saved scans for '{username}'.[/yellow]")
         return
-    console.print(f"\n  [bold]'{username}' tarama gecmisi[/bold] ({len(entries)})")
+    console.print(f"\n  [bold]Scan history for '{username}'[/bold] ({len(entries)})")
     for e in entries:
-        console.print(f"    [cyan]#{e.id}[/cyan]  {_fmt_ts(e.ts)}  bulunan: {e.found_count}")
+        console.print(f"    [cyan]#{e.id}[/cyan]  {_fmt_ts(e.ts)}  found: {e.found_count}")
+
+
+def _run_ai_analysis(result) -> None:
+    try:
+        from core.analysis import LLMAnalyzer, LLMUnavailable
+    except ImportError as exc:
+        console.print(f"  [red]AI module failed to load: {exc}[/red]")
+        return
+    console.print("  [cyan]Running AI analysis (local LLM)...[/cyan]")
+    try:
+        analyzer = LLMAnalyzer.from_env()
+        report = analyzer.analyze(result.to_dict())
+    except LLMUnavailable as exc:
+        console.print(f"  [yellow]AI analysis skipped: {exc}[/yellow]")
+        return
+    result.ai_report = report.to_dict()
 
 
 def _print_diff(username: str, result) -> None:
     current = get_latest(username)
     if current is None:
-        console.print("  [dim]diff: karsilastirma icin onceki tarama yok.[/dim]")
+        console.print("  [dim]diff: no previous scan to compare against.[/dim]")
         return
     previous = get_latest(username, before_id=current.id)
     if previous is None:
-        console.print("  [dim]diff: karsilastirma icin onceki tarama yok.[/dim]")
+        console.print("  [dim]diff: no previous scan to compare against.[/dim]")
         return
     d = diff_entries(previous, current)
     console.print(
-        f"\n  [bold]Fark[/bold] #{previous.id} ({_fmt_ts(previous.ts)}) "
+        f"\n  [bold]Diff[/bold] #{previous.id} ({_fmt_ts(previous.ts)}) "
         f"-> #{current.id} ({_fmt_ts(current.ts)})"
     )
     if d.added:
@@ -123,7 +147,7 @@ def _print_diff(username: str, result) -> None:
     if d.removed:
         console.print("    [red]- " + ", ".join(d.removed) + "[/red]")
     if not d.added and not d.removed:
-        console.print("    [dim]degisiklik yok.[/dim]")
+        console.print("    [dim]no changes.[/dim]")
 
 
 def _save_report(result, path: str) -> None:
@@ -145,7 +169,7 @@ def main() -> None:
 
     username = sanitize_username(args.username)
     if not username:
-        console.print("[red]Hata: Gecerli bir kullanici adi girin.[/red]")
+        console.print("[red]Error: please provide a valid username.[/red]")
         sys.exit(1)
 
     if args.history:
@@ -156,19 +180,22 @@ def main() -> None:
 
     if cfg.breach and not args.email and not args.full:
         console.print(
-            "  [yellow]Uyari:[/yellow] [bold]--breach[/bold] secildi; "
-            "email kesfetme otomatik etkinlestirildi."
+            "  [yellow]Warning:[/yellow] [bold]--breach[/bold] selected; "
+            "email discovery has been auto-enabled."
         )
 
-    mode_str = " + ".join(cfg.mode_parts()) or "Temel"
+    mode_str = " + ".join(cfg.mode_parts()) or "Basic"
     print_banner()
     print_scan_start(username, mode_str, get_platform_count())
 
     try:
         result = asyncio.run(run_scan(cfg))
     except KeyboardInterrupt:
-        console.print("\n\n  [yellow]Tarama iptal edildi.[/yellow]")
+        console.print("\n\n  [yellow]Scan cancelled.[/yellow]")
         sys.exit(0)
+
+    if args.ai:
+        _run_ai_analysis(result)
 
     print_results(result)
 

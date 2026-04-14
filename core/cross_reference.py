@@ -64,15 +64,15 @@ def cross_reference(found_platforms: list[PlatformResult]) -> CrossReferenceResu
         if best_match > 0.7:
             score += 40 * best_match
             matched_names.append(
-                f"'{best_pair[0]}' ~ '{best_pair[1]}' (benzerlik: {best_match:.0%})"
+                f"'{best_pair[0]}' ~ '{best_pair[1]}' (similarity: {best_match:.0%})"
             )
         elif best_match > 0.3:
             score += 40 * best_match * 0.5
             notes.append(
-                f"Isim kismen eslesiyor: '{best_pair[0]}' / '{best_pair[1]}'"
+                f"Partial name match: '{best_pair[0]}' / '{best_pair[1]}'"
             )
         else:
-            notes.append(f"Isimler farkli: {', '.join(all_names)}")
+            notes.append(f"Names differ: {', '.join(all_names)}")
 
     # location matching (weight: 30)
     total_weight += 30
@@ -104,7 +104,7 @@ def cross_reference(found_platforms: list[PlatformResult]) -> CrossReferenceResu
                         score += 30
                         linked_found = True
                         notes.append(
-                            f"{p.platform} → {key}: '{linked}' (dogrulanmis baglanti)"
+                            f"{p.platform} → {key}: '{linked}' (verified link)"
                         )
                         break
             if linked_found:

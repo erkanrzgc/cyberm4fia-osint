@@ -74,13 +74,13 @@ def test_export_html_escapes_username_and_renders_sections(tmp_path):
     assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html
     assert "<script>alert(1)</script>" not in html
     for section in (
-        "Bulunan Email'ler",
-        "Profil Fotograf Eslesmeleri",
-        "Web Varligi",
-        "WHOIS Kayitlari",
-        "DNS Kayitlari",
-        "Subdomain'ler",
-        "Akilli Arama",
-        "Guven Skoru",
+        "Discovered Emails",
+        "Profile Photo Matches",
+        "Web Presence",
+        "WHOIS Records",
+        "DNS Records",
+        "Subdomains",
+        "Smart Search",
+        "Confidence Score",
     ):
         assert section in html

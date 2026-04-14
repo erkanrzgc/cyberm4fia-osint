@@ -105,8 +105,8 @@ class TestScanConfig:
     def test_mode_parts(self):
         cfg = ScanConfig(username="a", deep=True, smart=True, email=True)
         parts = cfg.mode_parts()
-        assert "Derin" in parts
-        assert "Akilli" in parts
+        assert "Deep" in parts
+        assert "Smart" in parts
         assert "Email" in parts
 
     def test_mode_parts_empty(self):

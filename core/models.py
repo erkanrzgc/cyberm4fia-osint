@@ -78,6 +78,7 @@ class ScanResult:
     subdomains: list = field(default_factory=list)
     photo_matches: list = field(default_factory=list)
     scan_time: float = 0.0
+    ai_report: dict | None = None
 
     @property
     def found_platforms(self):
@@ -143,4 +144,5 @@ class ScanResult:
                 for m in self.photo_matches
             ],
             "web_presence": self.web_presence,
+            "ai_report": self.ai_report,
         }

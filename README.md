@@ -1,185 +1,267 @@
 # CyberM4fia OSINT
 
-Terminal tabanli bir OSINT kullanici adi tarama araci. `cyberm4fia-osint`, tek bir kullanici adini 91 platformda kontrol eder; uygun durumlarda derin profil verisi, akilli varyasyon aramasi, email/breach, web varligi, WHOIS, DNS ve subdomain bilgilerini toplar.
+```
+ ██████╗██╗   ██╗██████╗ ███████╗██████╗ ███╗   ███╗██╗  ██╗███████╗██╗ █████╗
+██╔════╝╚██╗ ██╔╝██╔══██╗██╔════╝██╔══██╗████╗ ████║██║  ██║██╔════╝██║██╔══██╗
+██║      ╚████╔╝ ██████╔╝█████╗  ██████╔╝██╔████╔██║███████║█████╗  ██║███████║
+██║       ╚██╔╝  ██╔══██╗██╔══╝  ██╔══██╗██║╚██╔╝██║╚════██║██╔══╝  ██║██╔══██║
+╚██████╗   ██║   ██████╔╝███████╗██║  ██║██║ ╚═╝ ██║     ██║██║     ██║██║  ██║
+ ╚═════╝   ╚═╝   ╚═════╝ ╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝     ╚═╝╚═╝     ╚═╝╚═╝  ╚═╝
+                    Open Source Intelligence by cyberm4fia
+```
 
-## Ozellikler
+A terminal-first OSINT username reconnaissance framework. `cyberm4fia-osint` hunts a single username across **116+ platforms** — social, dating, dev, gaming, professional, and more — then enriches the findings with deep profile scraping, cross-referencing, breach checks, WHOIS, DNS, subdomain enumeration, and an optional **local LLM analyst** (Cisco Foundation-Sec-8B) that writes a cybersecurity-aware report on the target.
 
-- 91 platformda kullanici adi kontrolu
-- Kategori bazli tarama: `social`, `dev`, `gaming`, `content`, `professional`, `community`, `other`
-- Derin profil taramasi ve capraz referans guven skoru
-- Akilli arama: username varyasyonlari ve bagli hesap kesfi
-- Email kesfi ve Gravatar kontrolu
-- HIBP breach sorgusu
-- Profil fotografi karsilastirma
-- WHOIS, DNS ve crt.sh tabanli subdomain enumeration
-- JSON ve HTML rapor export'u
-- SOCKS/HTTP proxy ve Tor destegi
-
-## Kurulum
-
-Python `3.10+` gerekir.
+No parameters. No tuning. Just:
 
 ```bash
+cyberm4fia <username>
+```
+
+---
+
+## Features
+
+- **116+ platforms** checked in parallel (social, dating, dev, gaming, content, professional, community)
+- **Zero-flag full scan** by default — everything on unless you opt out with `--quick`
+- **Deep profile scraping** for GitHub, GitLab, Reddit, Steam, Chess.com, Lichess, Keybase, Hacker News, Dev.to, and more
+- **Cross-reference engine** with confidence scoring across names, locations, and profile photos
+- **Smart search** — generates username variations and discovers linked accounts from scraped bios
+- **Email discovery** + Gravatar detection + HIBP breach lookup
+- **Profile photo matching** via perceptual hashing
+- **WHOIS / DNS / subdomain enumeration** (crt.sh)
+- **Wayback Machine** and paste-site presence
+- **Scan history** with SQLite + diff mode (`--diff` shows what changed between runs)
+- **Local LLM analysis** — plug in an OpenAI-compatible endpoint (LM Studio, llama.cpp, Ollama, vLLM) and get an AI-written identity / exposure report
+- **HTML + JSON + DOT graph** exports
+- **Tor / SOCKS / HTTP proxy** support
+- **MCP server** for Claude Desktop and other MCP-compatible clients
+- **CI-ready** — 212 tests, ~86% coverage, ruff + mypy clean
+
+---
+
+## Installation
+
+Requires Python **3.10+**.
+
+```bash
+git clone https://github.com/erkanrzgc/cyberm4fia-osint.git
+cd cyberm4fia-osint
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -e .
 ```
 
-Calistirma:
+After the editable install, the `cyberm4fia` command is available on your `$PATH`.
+
+Optional extras:
 
 ```bash
-python3 main.py <username>
+pip install -e '.[ai]'     # local LLM via llama-cpp-python
+pip install -e '.[photo]'  # profile photo hashing (Pillow, imagehash)
+pip install -e '.[proxy]'  # SOCKS / Tor support (aiohttp-socks)
+pip install -e '.[dev]'    # pytest, ruff, mypy, coverage
 ```
 
-## Hizli Baslangic
+---
 
-Temel tarama:
+## Quick Start
+
+Full scan (everything on):
 
 ```bash
-python3 main.py testuser
+cyberm4fia johndoe
 ```
 
-Sadece sosyal medya platformlari:
+Fast sweep — platform check only:
 
 ```bash
-python3 main.py testuser --category social --no-deep
+cyberm4fia johndoe --quick
 ```
 
-Tam tarama ve JSON rapor:
+Only a specific category:
 
 ```bash
-python3 main.py testuser --full --output reports/testuser.json
+cyberm4fia johndoe --category social,dev
 ```
 
-HIBP breach kontrolu:
+Export an HTML report:
 
 ```bash
-export HIBP_API_KEY="your_api_key"
-python3 main.py testuser --breach
+cyberm4fia johndoe --output reports/johndoe.html
 ```
 
-Tor uzerinden tarama:
+Run it behind Tor:
 
 ```bash
-python3 main.py testuser --tor
+cyberm4fia johndoe --tor
 ```
 
-Ozel proxy ile tarama:
+Diff against the previous run for the same username:
 
 ```bash
-python3 main.py testuser --proxy socks5://127.0.0.1:9050
+cyberm4fia johndoe --diff
 ```
 
-HTML rapor:
+---
+
+## AI Analysis (Local LLM)
+
+`cyberm4fia` ships with an optional local-LLM analyst. It takes the structured scan result and generates a concise cybersecurity report: identity summary, strong linkages, exposures, and next steps — all as JSON, parsed and displayed inline.
+
+**Recommended model:** [Foundation-Sec-1.1-8B-Instruct](https://huggingface.co/fdtn-ai/Foundation-Sec-1.1-8B-Instruct-Q4_K_M-GGUF) — Cisco's cybersecurity-tuned Llama 3.1 fine-tune. Q4_K_M is ~4.92 GB and runs fully GPU-offloaded on an 8 GB card.
+
+### Option A — LM Studio / OpenAI-compatible HTTP (default)
+
+1. Install [LM Studio](https://lmstudio.ai), download the model, and start the local server.
+2. In **Developer → Server Settings**, enable **Serve on Local Network**.
+3. Point `cyberm4fia` at the endpoint:
 
 ```bash
-python3 main.py testuser --smart --photo --web --output reports/testuser.html
+export CYBERM4FIA_LLM_URL="http://<host-ip>:1234/v1/chat/completions"
+export CYBERM4FIA_LLM_MODEL="foundation-sec-1.1-8b-instruct"
+cyberm4fia johndoe --ai
 ```
 
-## CLI Secenekleri
+For a VMware / WSL VM talking to an LM Studio instance on the Windows host, use the host adapter IP (e.g. `192.168.6.1` for VMnet8) instead of `localhost`.
 
-| Flag | Alias | Aciklama |
+### Option B — Embedded `llama-cpp-python`
+
+```bash
+pip install -e '.[ai]'
+export CYBERM4FIA_LLM_BACKEND=llama_cpp
+python -m core.analysis.download   # fetches the default GGUF
+cyberm4fia johndoe --ai
+```
+
+### Environment variables
+
+| Variable | Default | Purpose |
 | --- | --- | --- |
-| `username` | - | Aranacak kullanici adi |
-| `--smart` | `-s` | Username varyasyonlari ve kesfedilen bagli hesaplarla akilli arama |
-| `--deep` | `-d` | Derin profil taramasi; varsayilan olarak acik |
-| `--no-deep` | - | Derin profil taramasini kapatir |
-| `--email` | `-e` | Email kesfi ve Gravatar kontrolu |
-| `--web` | `-w` | Web varligi taramasi: Wayback, paste ve domain sinyalleri |
-| `--full` | `-f` | `deep + smart + email + web + whois + breach + photo + dns + subdomain` |
-| `--category` | `-c` | Kategori filtresi. Ornek: `social,dev,gaming` |
-| `--whois` | - | 9 TLD icin WHOIS sorgusu |
-| `--breach` | `--hibp` | HIBP breach kontrolu. `--email` secenegini otomatik etkinlestirir |
-| `--photo` | - | Profil fotograflari arasinda perceptual hash karsilastirmasi |
-| `--dns` | - | DNS kayitlarini sorgular |
-| `--subdomain` | - | `crt.sh` ile subdomain enumeration yapar |
-| `--tor` | `-toor` | Tarayi `socks5://127.0.0.1:9050` uzerinden calistirir |
-| `--proxy` | - | HTTP/SOCKS proxy adresi |
-| `--output` | `-o` | Sonuclari `.json` veya `.html` olarak kaydeder; uzanti verilmezse `.json` eklenir |
-| `--timeout` | `-t` | Istek zaman asimi, saniye cinsinden |
+| `CYBERM4FIA_LLM_BACKEND` | `http` | `http` or `llama_cpp` |
+| `CYBERM4FIA_LLM_URL` | `http://localhost:1234/v1/chat/completions` | HTTP endpoint |
+| `CYBERM4FIA_LLM_MODEL` | `""` | Model ID for the HTTP request |
+| `CYBERM4FIA_LLM_API_KEY` | `lm-studio` | Bearer token |
+| `CYBERM4FIA_LLM_TIMEOUT` | `120` | HTTP timeout (seconds) |
+| `CYBERM4FIA_LLM_REPO` | `fdtn-ai/Foundation-Sec-1.1-8B-Instruct-Q4_K_M-GGUF` | HF repo for `llama_cpp` backend |
+| `CYBERM4FIA_LLM_FILE` | `foundation-sec-1.1-8b-instruct-q4_k_m.gguf` | GGUF filename |
+| `CYBERM4FIA_LLM_CTX` | `4096` | Context window |
+| `CYBERM4FIA_LLM_MAX_TOKENS` | `768` | Max output tokens |
+| `CYBERM4FIA_LLM_TEMPERATURE` | `0.2` | Sampling temperature |
+| `CYBERM4FIA_LLM_GPU_LAYERS` | `-1` | llama.cpp GPU offload layers |
 
-## Optional Ozellikler ve Gereksinimler
+---
 
-| Ozellik | Flag | Gereken | Not |
-| --- | --- | --- | --- |
-| HIBP breach kontrolu | `--breach`, `--hibp` | `HIBP_API_KEY` environment variable | Anahtar yoksa uygulama uyari basar ve graceful skip yapar |
-| Foto karsilastirma | `--photo` | `Pillow`, `imagehash` | Eksikse perceptual hash yerine yalnizca daha sinirli eslesme yapilabilir |
-| WHOIS | `--whois` | `python-whois` | `username` icin `.com .net .org .io .dev .me .co .xyz .app` TLD'leri denenir |
-| DNS / subdomain | `--dns`, `--subdomain` | `dnspython` | `crt.sh` kaynakli gecici 0 sonuc gorulebilir |
-| SOCKS proxy / Tor | `--proxy`, `--tor`, `-toor` | `aiohttp-socks` | `--tor` yerel `127.0.0.1:9050` Tor servisi bekler |
+## CLI Reference
 
-## Kategori Dagilimi
+| Flag | Alias | Description |
+| --- | --- | --- |
+| `username` | — | Target username (positional) |
+| `--quick` | `-q` | Quick mode — platform sweep only |
+| `--full` | `-f` | Full scan (kept for backward compatibility; already the default) |
+| `--smart` | `-s` | Username variations + discovered linked accounts |
+| `--deep` / `--no-deep` | `-d` | Deep profile scraping (default: on) |
+| `--email` | `-e` | Email discovery + Gravatar |
+| `--breach` / `--hibp` | — | HIBP breach lookup (auto-enables `--email`) |
+| `--photo` | — | Profile photo perceptual-hash comparison |
+| `--web` | `-w` | Wayback / paste / domain presence |
+| `--whois` | — | WHOIS across 9 TLDs |
+| `--dns` | — | DNS record lookup |
+| `--subdomain` | — | crt.sh subdomain enumeration |
+| `--category` | `-c` | Restrict to categories (`social,dev,gaming,...`) |
+| `--tor` | `-toor` | Route through `socks5://127.0.0.1:9050` |
+| `--proxy` | — | Custom HTTP/SOCKS proxy |
+| `--output` | `-o` | Save report to `.json`, `.html`, or `.dot` |
+| `--timeout` | `-t` | Per-request timeout (seconds) |
+| `--history` | — | List prior scans for the username and exit |
+| `--diff` | — | Diff against the previous scan after running |
+| `--no-history` | — | Do not persist this scan |
+| `--ai` | — | Run local-LLM analysis on the result |
+| `--log-level` | — | `DEBUG`, `INFO`, `WARNING`, `ERROR` |
 
-- `social`: 16
-- `dev`: 20
-- `gaming`: 10
-- `content`: 14
-- `professional`: 9
-- `community`: 7
-- `other`: 15
+---
 
-Toplam: `91` platform.
+## Platform Coverage
 
-## Cikti Formatlari
+**116+ platforms** across seven categories. Highlights:
 
-JSON export:
+- **Social:** Instagram, X / Twitter, TikTok, Facebook, Snapchat, Threads, Bluesky, Mastodon, Reddit, Tumblr, VK, Telegram, Weibo, MySpace, Gab, Truth Social, Flipboard, Matrix, Clubhouse, Quora, Pinterest, Ask.fm, Badoo
+- **Dating:** Tinder, Badoo, MeetMe, Mamba, Hily, Tagged
+- **Dev:** GitHub, GitLab, Bitbucket, Dev.to, Stack Overflow, HackerOne, TryHackMe, HackTheBox, Kaggle, Hugging Face, Codeforces, LeetCode, Replit, CodePen, npm, PyPI, crates.io, Docker Hub
+- **Gaming:** Steam, Twitch, Chess.com, Lichess, Roblox, Xbox, NameMC, osu!, Speedrun.com, Fortnite Tracker
+- **Content:** YouTube, Medium, Substack, WordPress, Hashnode, SoundCloud, Spotify, Bandcamp, Vimeo, Dailymotion, Rumble, Kick
+- **Professional:** LinkedIn, Keybase, Behance, Dribbble, About.me, Gravatar, Wellfound, Crunchbase, Xing, ResearchGate, Academia.edu, Fiverr, Patreon
+- **Community & other:** Hacker News, Product Hunt, Ko-fi, BuyMeACoffee, Venmo, Cash App, PayPal.me, Strava, Untappd, Letterboxd, MyAnimeList, Goodreads, Tripadvisor, Couchsurfing, Meetup, Wattpad, Itch.io
 
-```bash
-python3 main.py testuser --output result.json
-```
+Want to add a platform? Edit `modules/platforms.yaml` — no code changes needed.
 
-HTML export:
+---
 
-```bash
-python3 main.py testuser --output result.html
-```
+## Output Formats
 
-HTML raporu su bolumleri uretebilir:
+- **Console** — rich, color-coded panels and tables (default)
+- **JSON** — `cyberm4fia user --output out.json`
+- **HTML** — `cyberm4fia user --output out.html` (self-contained, CSP-hardened)
+- **Graphviz DOT** — `cyberm4fia user --output out.dot`
 
-- Bulunan profiller
-- Derin profil detaylari
-- Capraz referans skoru
-- Email ve breach ozeti
-- Foto eslesmeleri
-- Web varligi
-- WHOIS kayitlari
-- DNS kayitlari
-- Subdomain'ler
-- Akilli arama varyasyonlari
+---
 
-## Ornek Senaryolar
+## Scan History
 
-Breach + WHOIS + DNS:
-
-```bash
-export HIBP_API_KEY="your_api_key"
-python3 main.py testuser --breach --whois --dns --subdomain --output intel.json
-```
-
-Sadece gelistirici ve gaming platformlari:
+Every run is persisted to a local SQLite database (`history.db`). Disable with `--no-history`.
 
 ```bash
-python3 main.py testuser --category dev,gaming --no-deep
+cyberm4fia johndoe --history   # list prior scans
+cyberm4fia johndoe --diff      # diff against the last run
 ```
 
-Dusuk timeout ile hizli smoke run:
+---
+
+## Docker
 
 ```bash
-python3 main.py testuser --no-deep --timeout 3
+docker build -t cyberm4fia-osint .
+docker run --rm cyberm4fia-osint johndoe --quick
 ```
 
-## Notlar
+---
 
-- Sonuclar hedef sitelerin anlik davranisina, rate limit'lerine ve ag durumuna gore degisebilir.
-- `--breach` tek basina kullanilsa bile email kesfi otomatik acilir.
-- Gecersiz veya bos kullanici adlari graceful exit ile reddedilir.
-- Fake proxy veya baglanti sorunlari crash yerine bos/hatali sonuc olarak islenir.
-
-## Gelistirme
-
-Bagimliliklari kurduktan sonra temel smoke kontrolu:
+## Development
 
 ```bash
-python3 main.py --help
-python3 -m compileall main.py core modules utils
+pip install -e '.[dev]'
+pytest                              # 212 tests
+pytest --cov=core --cov=modules     # coverage report
+ruff check .
+mypy core modules main.py
 ```
+
+GitHub Actions runs the full matrix on every push.
+
+---
+
+## Legal & Ethical Use
+
+This tool queries **public** profile endpoints — the same information anyone can view in a browser. Use it for:
+
+- Security research and defensive OSINT
+- CTF challenges and red-team exercises with written authorization
+- Your own digital-footprint audit
+- Journalism and investigative research within applicable law
+
+**Do not** use it for harassment, stalking, doxing, or any activity that violates local law or the target platform's terms of service. The authors accept no responsibility for misuse.
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+---
+
+## Acknowledgements
+
+- [Cisco Foundation AI](https://huggingface.co/fdtn-ai) for the Foundation-Sec cybersecurity LLM
+- [Have I Been Pwned](https://haveibeenpwned.com) for breach data
+- [crt.sh](https://crt.sh) for certificate transparency
+- The OSINT community — this project stands on a mountain of prior work

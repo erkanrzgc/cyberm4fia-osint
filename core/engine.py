@@ -132,13 +132,13 @@ def _select_platforms(categories: tuple[str, ...] | None) -> list[Platform]:
 async def _phase_platform_check(
     client: HTTPClient, cfg: ScanConfig, platforms: list[Platform], result: ScanResult
 ) -> list[PlatformResult]:
-    console.print("  [bold yellow][1/8][/bold yellow] Platform taramasi baslatiliyor...")
+    console.print("  [bold yellow][1/8][/bold yellow] Starting platform sweep...")
     tasks = [_check_platform(client, cfg.username, p) for p in platforms]
     platform_results = await asyncio.gather(*tasks)
     found_count = sum(1 for r in platform_results if r.exists)
     console.print(
-        f"  [bold green][1/8][/bold green] Tamamlandi: "
-        f"[green]{found_count}[/green]/{len(platform_results)} platformda bulundu"
+        f"  [bold green][1/8][/bold green] Done: "
+        f"[green]{found_count}[/green]/{len(platform_results)} platforms matched"
     )
     result.platforms = list(platform_results)
     return platform_results
@@ -150,18 +150,18 @@ async def _phase_deep_scrape(
     platform_results: list[PlatformResult],
 ) -> None:
     if not cfg.deep:
-        console.print("  [dim][2/8] Derin tarama: Atlanildi[/dim]")
+        console.print("  [dim][2/8] Deep scrape: skipped[/dim]")
         return
 
     targets = [
         r for r in platform_results if r.exists and r.platform in DEEP_SCRAPERS
     ]
     if not targets:
-        console.print("  [bold green][2/8][/bold green] Derin tarama: Uygun profil yok")
+        console.print("  [bold green][2/8][/bold green] Deep scrape: no eligible profiles")
         return
 
     console.print(
-        f"  [bold yellow][2/8][/bold yellow] Derin tarama: {len(targets)} profil analiz ediliyor..."
+        f"  [bold yellow][2/8][/bold yellow] Deep scrape: analyzing {len(targets)} profiles..."
     )
     deep_results = await asyncio.gather(
         *(_deep_scrape(client, cfg.username, r) for r in targets)
@@ -171,7 +171,7 @@ async def _phase_deep_scrape(
             target.profile_data = data
 
     scraped = sum(1 for d in deep_results if d)
-    console.print(f"  [bold green][2/8][/bold green] Tamamlandi: {scraped} profil detayi cekildi")
+    console.print(f"  [bold green][2/8][/bold green] Done: {scraped} profile details pulled")
 
 
 async def _phase_smart_search(
@@ -182,10 +182,10 @@ async def _phase_smart_search(
     result: ScanResult,
 ) -> None:
     if not cfg.smart:
-        console.print("  [dim][3/8] Akilli arama: Atlanildi[/dim]")
+        console.print("  [dim][3/8] Smart search: skipped[/dim]")
         return
 
-    console.print("  [bold yellow][3/8][/bold yellow] Akilli arama baslatiliyor...")
+    console.print("  [bold yellow][3/8][/bold yellow] Starting smart search...")
 
     discoveries = [
         extract_discoverable_data(r.profile_data)
@@ -206,14 +206,14 @@ async def _phase_smart_search(
         if not any(r.platform == p.name and r.exists for r in platform_results)
     ]
     if not (variations and not_found_platforms):
-        console.print("  [bold green][3/8][/bold green] Tamamlandi")
+        console.print("  [bold green][3/8][/bold green] Done")
         return
 
     important = [p for p in not_found_platforms if p.name in IMPORTANT_PLATFORMS_FOR_VARIATIONS]
     check_platforms = important[:8]
     check_variations = variations[:5]
     if not check_platforms:
-        console.print("  [bold green][3/8][/bold green] Varyasyon kontrol edilecek platform yok")
+        console.print("  [bold green][3/8][/bold green] No platforms left to check variations on")
         return
 
     var_tasks = [
@@ -224,13 +224,13 @@ async def _phase_smart_search(
     var_results = await asyncio.gather(*var_tasks)
     var_found = [r for r in var_results if r.exists]
     for vr in var_found:
-        vr.status = "found (varyasyon)"
+        vr.status = "found (variation)"
         result.platforms.append(vr)
 
     console.print(
-        f"  [bold green][3/8][/bold green] Tamamlandi: "
-        f"{len(check_variations)} varyasyon x {len(check_platforms)} platform, "
-        f"{len(var_found)} yeni sonuc"
+        f"  [bold green][3/8][/bold green] Done: "
+        f"{len(check_variations)} variations x {len(check_platforms)} platforms, "
+        f"{len(var_found)} new results"
     )
 
 
@@ -238,14 +238,14 @@ async def _phase_photo(
     client: HTTPClient, cfg: ScanConfig, result: ScanResult
 ) -> None:
     if not cfg.photo:
-        console.print("  [dim][4/8] Foto karsilastirma: Atlanildi[/dim]")
+        console.print("  [dim][4/8] Photo comparison: skipped[/dim]")
         return
 
-    console.print("  [bold yellow][4/8][/bold yellow] Profil fotograflari karsilastiriliyor...")
+    console.print("  [bold yellow][4/8][/bold yellow] Comparing profile photos...")
     avatars = _extract_avatar_urls(result.found_platforms)
     if len(avatars) < 2:
         console.print(
-            "  [bold green][4/8][/bold green] Yeterli profil fotografi yok (en az 2 gerekli)"
+            "  [bold green][4/8][/bold green] Not enough profile photos (need at least 2)"
         )
         return
 
@@ -260,8 +260,8 @@ async def _phase_photo(
         for m in photo_results
     ]
     console.print(
-        f"  [bold green][4/8][/bold green] Tamamlandi: "
-        f"{len(avatars)} foto kontrol edildi, {len(photo_results)} eslesme bulundu"
+        f"  [bold green][4/8][/bold green] Done: "
+        f"{len(avatars)} photos checked, {len(photo_results)} matches found"
     )
 
 
@@ -272,10 +272,10 @@ async def _phase_email_breach(
     result: ScanResult,
 ) -> None:
     if not cfg.email:
-        console.print("  [dim][5/8] Email kesfetme: Atlanildi[/dim]")
+        console.print("  [dim][5/8] Email discovery: skipped[/dim]")
         return
 
-    console.print("  [bold yellow][5/8][/bold yellow] Email kesfediliyor...")
+    console.print("  [bold yellow][5/8][/bold yellow] Discovering emails...")
     known_emails = [
         e
         for r in platform_results
@@ -287,7 +287,7 @@ async def _phase_email_breach(
     email_results = await discover_emails(client, cfg.username, known_emails)
 
     if cfg.breach and hibp_available():
-        console.print("  [bold yellow][5/8][/bold yellow] HIBP breach kontrolu...")
+        console.print("  [bold yellow][5/8][/bold yellow] HIBP breach check...")
         # Collect every unique email once, look them up in parallel.
         unique_emails = list({er.email for er in email_results} | set(known_emails))
         breach_map = await check_many_emails(client, unique_emails)
@@ -312,12 +312,12 @@ async def _phase_email_breach(
                 )
     elif cfg.breach:
         console.print(
-            "  [dim][5/8] HIBP breach kontrolu: HIBP_API_KEY olmadigi icin atlanildi[/dim]"
+            "  [dim][5/8] HIBP breach check: skipped (HIBP_API_KEY not set)[/dim]"
         )
 
     result.emails = email_results
     console.print(
-        f"  [bold green][5/8][/bold green] Tamamlandi: {len(email_results)} email bulundu"
+        f"  [bold green][5/8][/bold green] Done: {len(email_results)} emails found"
     )
 
 
@@ -328,24 +328,24 @@ async def _phase_web_presence(
     result: ScanResult,
 ) -> None:
     if not cfg.web:
-        console.print("  [dim][6/8] Web varligi: Atlanildi[/dim]")
+        console.print("  [dim][6/8] Web presence: skipped[/dim]")
         return
-    console.print("  [bold yellow][6/8][/bold yellow] Web varligi arastiriliyor...")
+    console.print("  [bold yellow][6/8][/bold yellow] Investigating web presence...")
     found_urls = [r.url for r in platform_results if r.exists]
     result.web_presence = await discover_web_presence(client, cfg.username, found_urls)
     console.print(
-        f"  [bold green][6/8][/bold green] Tamamlandi: {len(result.web_presence)} web varligi bulundu"
+        f"  [bold green][6/8][/bold green] Done: {len(result.web_presence)} web presence entries found"
     )
 
 
 async def _phase_whois(cfg: ScanConfig, result: ScanResult) -> None:
     if not cfg.whois:
-        console.print("  [dim][7/8] WHOIS: Atlanildi[/dim]")
+        console.print("  [dim][7/8] WHOIS: skipped[/dim]")
         return
-    console.print("  [bold yellow][7/8][/bold yellow] WHOIS sorgulari...")
+    console.print("  [bold yellow][7/8][/bold yellow] Running WHOIS lookups...")
     result.whois_records = await check_username_domains(cfg.username)
     console.print(
-        f"  [bold green][7/8][/bold green] Tamamlandi: {len(result.whois_records)} kayitli domain"
+        f"  [bold green][7/8][/bold green] Done: {len(result.whois_records)} registered domains"
     )
 
 
@@ -353,10 +353,10 @@ async def _phase_dns_subdomain(
     client: HTTPClient, cfg: ScanConfig, result: ScanResult
 ) -> None:
     if not (cfg.dns or cfg.subdomain):
-        console.print("  [dim][8/8] DNS/subdomain: Atlanildi[/dim]")
+        console.print("  [dim][8/8] DNS/subdomain: skipped[/dim]")
         return
 
-    console.print("  [bold yellow][8/8][/bold yellow] DNS / subdomain taramasi...")
+    console.print("  [bold yellow][8/8][/bold yellow] DNS / subdomain scan...")
     domains_to_check = [r["domain"] for r in result.whois_records] or [f"{cfg.username}.com"]
 
     for domain in domains_to_check[:3]:
@@ -370,8 +370,8 @@ async def _phase_dns_subdomain(
                 result.subdomains.extend(subs[:50])
 
     console.print(
-        f"  [bold green][8/8][/bold green] Tamamlandi: "
-        f"{len(result.dns_records)} DNS, {len(result.subdomains)} subdomain"
+        f"  [bold green][8/8][/bold green] Done: "
+        f"{len(result.dns_records)} DNS, {len(result.subdomains)} subdomains"
     )
 
 
@@ -384,7 +384,7 @@ def _finalize_cross_reference(result: ScanResult) -> None:
     ]
     if result.photo_matches:
         cr.confidence = min(100.0, cr.confidence + 20.0 * len(result.photo_matches))
-        cr.notes.append(f"{len(result.photo_matches)} profil fotografi eslesti")
+        cr.notes.append(f"{len(result.photo_matches)} profile photos matched")
     result.cross_reference = cr
 
 
@@ -402,7 +402,7 @@ async def run_scan(cfg: ScanConfig) -> ScanResult:
     ) as client:
         if cfg.breach and not hibp_available():
             console.print(
-                "  [yellow]Uyari:[/yellow] [bold]HIBP_API_KEY[/bold] tanimli degil; breach kontrolu atlanacak."
+                "  [yellow]Warning:[/yellow] [bold]HIBP_API_KEY[/bold] not set; breach check will be skipped."
             )
 
         platform_results = await _phase_platform_check(client, cfg, platforms, result)

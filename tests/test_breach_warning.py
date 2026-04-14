@@ -36,7 +36,7 @@ def test_breach_alone_auto_enables_email_and_prints_warning(monkeypatch):
     cfg = seen["cfg"]
     assert cfg.email is True
     assert cfg.breach is True
-    assert any("otomatik etkinlestirildi" in call for call in spy.calls)
+    assert any("auto-enabled" in call for call in spy.calls)
 
 
 def test_engine_warns_when_hibp_key_missing(monkeypatch):
@@ -67,4 +67,4 @@ def test_engine_warns_when_hibp_key_missing(monkeypatch):
 
     assert result.username == "testuser"
     assert any("HIBP_API_KEY" in call for call in spy.calls)
-    assert any("atlan" in call.lower() for call in spy.calls)
+    assert any("skip" in call.lower() for call in spy.calls)

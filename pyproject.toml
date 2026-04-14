@@ -33,12 +33,18 @@ socks = ["aiohttp-socks>=0.8.0"]
 whois = ["python-whois>=0.9.0"]
 photo = ["Pillow>=10.0.0", "imagehash>=4.3.0"]
 dns = ["dnspython>=2.4.0"]
+ai = [
+    "llama-cpp-python>=0.3.0",
+    "huggingface_hub>=0.24.0",
+]
 all = [
     "aiohttp-socks>=0.8.0",
     "python-whois>=0.9.0",
     "Pillow>=10.0.0",
     "imagehash>=4.3.0",
     "dnspython>=2.4.0",
+    "llama-cpp-python>=0.3.0",
+    "huggingface_hub>=0.24.0",
 ]
 dev = [
     "pytest>=8.0.0",
@@ -52,6 +58,7 @@ dev = [
 
 [project.scripts]
 cyberm4fia-osint = "main:main"
+cyberm4fia = "main:main"
 
 [project.urls]
 Homepage = "https://github.com/cyberm4fia/cyberm4fia-osint"
@@ -60,7 +67,7 @@ Homepage = "https://github.com/cyberm4fia/cyberm4fia-osint"
 py-modules = ["main"]
 
 [tool.setuptools.packages.find]
-include = ["core*", "modules*", "utils*"]
+include = ["core*", "modules*", "utils*", "core.analysis*"]
 
 [tool.ruff]
 line-length = 100

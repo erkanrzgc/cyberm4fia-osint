@@ -48,13 +48,13 @@ USER_AGENTS = [
 ]
 
 CATEGORIES = {
-    "social": "Sosyal Medya",
-    "dev": "Gelistirici",
-    "gaming": "Oyun",
-    "content": "Icerik",
-    "professional": "Profesyonel",
-    "community": "Topluluk",
-    "other": "Diger",
+    "social": "Social Media",
+    "dev": "Developer",
+    "gaming": "Gaming",
+    "content": "Content",
+    "professional": "Professional",
+    "community": "Community",
+    "other": "Other",
 }
 
 
@@ -79,15 +79,19 @@ class ScanConfig:
 
     @classmethod
     def from_args(cls, args, username: str) -> ScanConfig:
-        deep = not args.no_deep
-        smart = args.smart
-        email = args.email
-        web = args.web
-        whois = args.whois
-        breach = args.breach
-        photo = args.photo
-        dns = args.dns
-        subdomain = args.subdomain
+        # Default behavior: run everything. Individual --flags still work
+        # as explicit toggles; --quick restricts to the minimal profile sweep.
+        full_default = not getattr(args, "quick", False)
+
+        deep = (not args.no_deep) and (full_default or args.deep)
+        smart = args.smart or full_default
+        email = args.email or full_default
+        web = args.web or full_default
+        whois = args.whois or full_default
+        breach = args.breach or full_default
+        photo = args.photo or full_default
+        dns = args.dns or full_default
+        subdomain = args.subdomain or full_default
 
         if args.full:
             deep = smart = email = web = True
@@ -120,13 +124,13 @@ class ScanConfig:
     def mode_parts(self) -> list[str]:
         parts: list[str] = []
         mapping = [
-            (self.deep, "Derin"),
-            (self.smart, "Akilli"),
+            (self.deep, "Deep"),
+            (self.smart, "Smart"),
             (self.email, "Email"),
             (self.web, "Web"),
             (self.whois, "WHOIS"),
             (self.breach, "Breach"),
-            (self.photo, "Foto"),
+            (self.photo, "Photo"),
             (self.dns, "DNS"),
             (self.subdomain, "Subdomain"),
             (self.tor, "Tor"),
