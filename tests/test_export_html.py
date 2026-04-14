@@ -1,0 +1,86 @@
+"""Deterministic HTML export coverage for escaping and section parity."""
+
+from core.models import (
+    CrossReferenceResult,
+    EmailResult,
+    PhotoMatch,
+    PlatformResult,
+    ScanResult,
+)
+from core.reporter import export_html
+
+
+def test_export_html_escapes_username_and_renders_sections(tmp_path):
+    result = ScanResult(
+        username="<script>alert(1)</script>",
+        platforms=[
+            PlatformResult(
+                platform="GitHub",
+                url="https://github.com/alice",
+                category="dev",
+                exists=True,
+                status="found",
+                response_time=0.42,
+                profile_data={"name": "Alice", "location": "Istanbul"},
+            )
+        ],
+        emails=[
+            EmailResult(
+                email="alice@example.com",
+                source="gravatar",
+                verified=True,
+                gravatar=True,
+                breach_count=2,
+            )
+        ],
+        web_presence=[
+            {"type": "wayback", "original_url": "https://github.com/alice", "url": "https://web.archive.org/example"}
+        ],
+        whois_records=[
+            {
+                "domain": "alice.dev",
+                "registrar": "Example Registrar",
+                "creation_date": "2024-01-01",
+                "expiration_date": "2027-01-01",
+                "org": "Alice Labs",
+            }
+        ],
+        dns_records={"alice.dev": {"A": ["1.2.3.4"], "MX": ["mail.alice.dev"]}},
+        subdomains=["api.alice.dev", "www.alice.dev"],
+        variations_checked=["alice_", "realalice"],
+        discovered_usernames=["alice_dev"],
+        photo_matches=[
+            PhotoMatch(
+                platform_a="GitHub",
+                platform_b="Twitter / X",
+                similarity=0.91,
+                method="phash",
+            )
+        ],
+        scan_time=1.23,
+    )
+    result.cross_reference = CrossReferenceResult(
+        confidence=88.0,
+        matched_names=["alice -> GitHub, Twitter / X"],
+        matched_locations=["istanbul -> GitHub"],
+        matched_photos=["GitHub ↔ Twitter / X (91%, phash)"],
+        notes=["1 profil fotografi eslesti"],
+    )
+
+    report = tmp_path / "report.html"
+    export_html(result, str(report))
+    html = report.read_text(encoding="utf-8")
+
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html
+    assert "<script>alert(1)</script>" not in html
+    for section in (
+        "Bulunan Email'ler",
+        "Profil Fotograf Eslesmeleri",
+        "Web Varligi",
+        "WHOIS Kayitlari",
+        "DNS Kayitlari",
+        "Subdomain'ler",
+        "Akilli Arama",
+        "Guven Skoru",
+    ):
+        assert section in html

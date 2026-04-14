@@ -1,0 +1,15 @@
+aiohttp>=3.9.0
+aiohttp-socks>=0.8.0
+rich>=13.0.0
+beautifulsoup4>=4.12.0
+PyYAML>=6.0
+# Optional feature deps:
+#   --whois                 -> python-whois
+#   --photo                 -> Pillow + imagehash
+#   --dns / --subdomain     -> dnspython
+#   --tor / --proxy socks5  -> aiohttp-socks
+#   --breach / --hibp       -> HIBP_API_KEY env var (no extra package)
+python-whois>=0.9.0
+imagehash>=4.3.0
+Pillow>=10.0.0
+dnspython>=2.4.0

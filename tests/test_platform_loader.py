@@ -1,0 +1,163 @@
+"""Tests for core/platform_loader.py — YAML loading and user overrides."""
+
+from pathlib import Path
+
+import pytest
+
+from core import platform_loader
+from core.platform_loader import Platform, _coerce, load_platforms
+
+
+def test_coerce_minimal():
+    p = _coerce({"name": "X", "url": "https://x/{username}", "category": "social"})
+    assert p.name == "X"
+    assert p.check_type == "status"
+    assert p.has_deep_scraper is False
+
+
+def test_coerce_full():
+    p = _coerce(
+        {
+            "name": "Y",
+            "url": "https://y/{username}",
+            "category": "dev",
+            "check_type": "content_absent",
+            "error_text": "nope",
+            "headers": {"X": "v"},
+            "has_deep_scraper": True,
+        }
+    )
+    assert p.check_type == "content_absent"
+    assert p.error_text == "nope"
+    assert p.headers == {"X": "v"}
+    assert p.has_deep_scraper is True
+
+
+def test_coerce_missing_field():
+    with pytest.raises(ValueError):
+        _coerce({"name": "X", "category": "s"})
+
+
+def test_coerce_bad_placeholder():
+    with pytest.raises(ValueError):
+        _coerce({"name": "X", "url": "https://x", "category": "s"})
+
+
+def test_coerce_invalid_check_type():
+    with pytest.raises(ValueError):
+        _coerce(
+            {"name": "X", "url": "https://x/{username}", "category": "s", "check_type": "bogus"}
+        )
+
+
+def test_coerce_bad_headers():
+    with pytest.raises(ValueError):
+        _coerce(
+            {
+                "name": "X",
+                "url": "https://x/{username}",
+                "category": "s",
+                "headers": "not-a-dict",
+            }
+        )
+
+
+def test_load_platforms_default():
+    platforms = load_platforms()
+    assert len(platforms) >= 80
+    names = {p.name for p in platforms}
+    assert "GitHub" in names
+    assert "Instagram" in names
+
+
+def test_user_override_adds_and_replaces(tmp_path: Path, monkeypatch):
+    user_file = tmp_path / "custom.yaml"
+    user_file.write_text(
+        """
+platforms:
+  - name: GitHub
+    url: https://github.test/{username}
+    category: dev
+    has_deep_scraper: false
+  - name: MyCustomSite
+    url: https://my.test/{username}
+    category: other
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("CYBERM4FIA_PLATFORMS_FILE", str(user_file))
+    monkeypatch.setattr(platform_loader, "USER_YAML", tmp_path / "absent.yaml")
+
+    platforms = load_platforms()
+    by_name = {p.name: p for p in platforms}
+
+    assert "MyCustomSite" in by_name
+    assert by_name["MyCustomSite"].category == "other"
+    assert by_name["GitHub"].url == "https://github.test/{username}"
+    assert by_name["GitHub"].has_deep_scraper is False
+
+
+def test_user_disable_removes_builtin(tmp_path: Path, monkeypatch):
+    user_file = tmp_path / "disable.yaml"
+    user_file.write_text(
+        """
+platforms:
+  - name: GitHub
+    disabled: true
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("CYBERM4FIA_PLATFORMS_FILE", str(user_file))
+    monkeypatch.setattr(platform_loader, "USER_YAML", tmp_path / "absent.yaml")
+
+    platforms = load_platforms()
+    assert not any(p.name == "GitHub" for p in platforms)
+
+
+def test_malformed_yaml_ignored(tmp_path: Path, monkeypatch):
+    user_file = tmp_path / "bad.yaml"
+    user_file.write_text(": : not yaml :\n", encoding="utf-8")
+    monkeypatch.setenv("CYBERM4FIA_PLATFORMS_FILE", str(user_file))
+    monkeypatch.setattr(platform_loader, "USER_YAML", tmp_path / "absent.yaml")
+
+    # Loader must survive and still return builtins
+    platforms = load_platforms()
+    assert len(platforms) >= 80
+
+
+def test_non_mapping_top_level_ignored(tmp_path: Path, monkeypatch):
+    user_file = tmp_path / "list.yaml"
+    user_file.write_text("- just a list\n", encoding="utf-8")
+    monkeypatch.setenv("CYBERM4FIA_PLATFORMS_FILE", str(user_file))
+    monkeypatch.setattr(platform_loader, "USER_YAML", tmp_path / "absent.yaml")
+
+    platforms = load_platforms()
+    assert len(platforms) >= 80
+
+
+def test_invalid_entry_in_user_file_skipped(tmp_path: Path, monkeypatch):
+    user_file = tmp_path / "mix.yaml"
+    user_file.write_text(
+        """
+platforms:
+  - name: Broken
+    category: dev
+  - name: Good
+    url: https://good.test/{username}
+    category: dev
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("CYBERM4FIA_PLATFORMS_FILE", str(user_file))
+    monkeypatch.setattr(platform_loader, "USER_YAML", tmp_path / "absent.yaml")
+
+    platforms = load_platforms()
+    names = {p.name for p in platforms}
+    assert "Good" in names
+    assert "Broken" not in names
+
+
+def test_platform_dataclass_defaults():
+    p = Platform(name="A", url="https://a/{username}", category="dev")
+    assert p.check_type == "status"
+    assert p.headers is None

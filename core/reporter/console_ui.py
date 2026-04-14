@@ -1,0 +1,427 @@
+"""Rich terminal output for scan progress and results."""
+
+from __future__ import annotations
+
+import contextlib
+from datetime import datetime, timezone
+
+from rich import box
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
+from rich.tree import Tree
+
+from core.config import BANNER, CATEGORIES
+from core.models import PlatformResult, ScanResult
+
+console = Console()
+
+CATEGORY_COLORS = {
+    "social": "magenta",
+    "dev": "green",
+    "gaming": "yellow",
+    "content": "blue",
+    "professional": "cyan",
+    "community": "red",
+    "other": "white",
+}
+
+DISPLAY_KEYS = {
+    "name": "Isim",
+    "full_name": "Tam Isim",
+    "real_name": "Gercek Isim",
+    "persona_name": "Profil Ismi",
+    "bio": "Bio",
+    "summary": "Ozet",
+    "about": "Hakkinda",
+    "location": "Konum",
+    "country": "Ulke",
+    "email": "Email",
+    "company": "Sirket",
+    "organization": "Organizasyon",
+    "job_title": "Unvan",
+    "blog": "Blog",
+    "website_url": "Website",
+    "twitter_username": "Twitter",
+    "github_username": "GitHub",
+    "followers": "Takipci",
+    "following": "Takip Edilen",
+    "public_repos": "Public Repo",
+    "karma": "Karma",
+    "link_karma": "Link Karma",
+    "comment_karma": "Yorum Karma",
+    "total_karma": "Toplam Karma",
+    "created_at": "Olusturulma",
+    "joined_at": "Katilim",
+    "member_since": "Uye Olma",
+    "hireable": "Ise Acik",
+    "has_verified_email": "Email Dogrulanmis",
+    "is_gold": "Reddit Gold",
+    "is_mod": "Moderator",
+    "status": "Durum",
+    "is_streamer": "Yayinci",
+    "steam_id": "Steam ID",
+    "vac_banned": "VAC Ban",
+    "online_state": "Cevrimici Durum",
+    "submitted_count": "Gonderi Sayisi",
+    "count_all": "Toplam Oyun",
+    "patron": "Patron",
+    "play_time_total": "Toplam Oynama Suresi",
+}
+
+RATING_KEYS = (
+    "chess_rapid_rating",
+    "chess_blitz_rating",
+    "chess_bullet_rating",
+    "rapid_rating",
+    "blitz_rating",
+    "bullet_rating",
+    "classical_rating",
+)
+
+
+def print_banner() -> None:
+    lines = BANNER.strip("\n").split("\n")
+    start, end = (230, 230, 230), (40, 40, 40)
+    denom = max(len(lines) - 1, 1)
+    for i, line in enumerate(lines):
+        ratio = i / denom
+        r, g, b = (int(start[j] + (end[j] - start[j]) * ratio) for j in range(3))
+        console.print(f"[#{r:02x}{g:02x}{b:02x}]{line}[/]")
+    console.print(f"[#646464]{'─' * 80}[/]")
+    console.print(
+        "  [dim]Public OSINT Intelligence Gathering Framework[/dim]\n",
+        justify="center",
+    )
+
+
+def print_scan_start(username: str, mode: str, platform_count: int) -> None:
+    console.print()
+    console.print(
+        Panel(
+            f"[bold white]Hedef:[/bold white] [cyan]{username}[/cyan]\n"
+            f"[bold white]Mod:[/bold white] [yellow]{mode}[/yellow]\n"
+            f"[bold white]Platform:[/bold white] [green]{platform_count}[/green] site taranacak",
+            title="[bold red]TARAMA BASLATILIYOR[/bold red]",
+            border_style="red",
+            padding=(1, 2),
+        )
+    )
+    console.print()
+
+
+def print_progress(current: int, total: int, platform: str, found: bool) -> None:
+    status = "[bold green]BULUNDU[/bold green]" if found else "[dim]bulunamadi[/dim]"
+    bar_len = 30
+    filled = int(bar_len * current / total) if total else 0
+    bar = "█" * filled + "░" * (bar_len - filled)
+    console.print(f"\r  [{bar}] {current}/{total} | {platform}: {status}", end="")
+
+
+def print_results(result: ScanResult) -> None:
+    console.print("\n")
+    _print_summary(result)
+
+    if not result.found_platforms:
+        console.print("\n  [yellow]Hicbir platformda profil bulunamadi.[/yellow]\n")
+        return
+
+    _print_platforms_table(result)
+    _print_deep_profiles(result)
+    _print_cross_reference(result)
+    _print_emails(result)
+    _print_photo_matches(result)
+    _print_whois(result)
+    _print_dns(result)
+    _print_subdomains(result)
+    _print_web_presence(result)
+    _print_variations(result)
+    _print_discovered_usernames(result)
+    console.print()
+
+
+def _print_summary(result: ScanResult) -> None:
+    summary = (
+        f"[bold white]Kullanici:[/bold white] [cyan]{result.username}[/cyan]\n"
+        f"[bold white]Taranan:[/bold white] [yellow]{result.total_checked}[/yellow] platform\n"
+        f"[bold white]Bulunan:[/bold white] [bold green]{result.found_count}[/bold green] profil\n"
+        f"[bold white]Sure:[/bold white] [dim]{result.scan_time:.1f}s[/dim]"
+    )
+    console.print(
+        Panel(summary, title="[bold green]TARAMA TAMAMLANDI[/bold green]", border_style="green")
+    )
+
+
+def _print_platforms_table(result: ScanResult) -> None:
+    console.print()
+    table = Table(
+        title="Bulunan Profiller",
+        box=box.DOUBLE_EDGE,
+        title_style="bold cyan",
+        header_style="bold white",
+        border_style="cyan",
+        show_lines=True,
+    )
+    table.add_column("#", style="dim", width=4, justify="right")
+    table.add_column("Platform", style="bold", min_width=15)
+    table.add_column("Kategori", min_width=12)
+    table.add_column("URL", style="blue underline", min_width=30)
+    table.add_column("Yanit", justify="right", width=8)
+
+    for i, p in enumerate(result.found_platforms, 1):
+        cat = CATEGORIES.get(p.category, p.category)
+        color = CATEGORY_COLORS.get(p.category, "white")
+        rt = f"{p.response_time:.1f}s" if p.response_time else "-"
+        table.add_row(str(i), p.platform, f"[{color}]{cat}[/{color}]", p.url, rt)
+
+    console.print(table)
+
+
+def _print_deep_profiles(result: ScanResult) -> None:
+    profiles_with_data = [p for p in result.found_platforms if p.profile_data]
+    if not profiles_with_data:
+        return
+    console.print()
+    console.print(
+        Panel("[bold]Derin Profil Bilgileri[/bold]", border_style="yellow", padding=(0, 1))
+    )
+    for p in profiles_with_data:
+        _print_profile_detail(p)
+
+
+def _print_profile_detail(p: PlatformResult) -> None:
+    d = p.profile_data
+    if not d:
+        return
+    tree = Tree(f"[bold yellow]{p.platform}[/bold yellow] — [blue]{p.url}[/blue]")
+
+    for key, label in DISPLAY_KEYS.items():
+        val = d.get(key)
+        if val in (None, "", 0):
+            continue
+        if isinstance(val, bool):
+            val = "[green]Evet[/green]" if val else "[red]Hayir[/red]"
+        elif isinstance(val, int) and key.endswith("_utc"):
+            with contextlib.suppress(OSError, ValueError):
+                val = datetime.fromtimestamp(val, tz=timezone.utc).strftime("%Y-%m-%d")
+        elif isinstance(val, int) and val > 1_000_000_000:
+            with contextlib.suppress(OSError, ValueError):
+                val = datetime.fromtimestamp(val / 1000, tz=timezone.utc).strftime("%Y-%m-%d")
+        tree.add(f"[bold]{label}:[/bold] {val}")
+
+    for rk in RATING_KEYS:
+        val = d.get(rk)
+        if val:
+            label = rk.replace("_", " ").replace("chess ", "").title()
+            tree.add(f"[bold]{label}:[/bold] {val}")
+
+    proofs = d.get("proofs", [])
+    if proofs:
+        proofs_branch = tree.add("[bold]Bagli Hesaplar (Keybase):[/bold]")
+        for proof in proofs:
+            if isinstance(proof, dict):
+                proofs_branch.add(
+                    f"{proof.get('service', '?')}: [cyan]{proof.get('username', '?')}[/cyan]"
+                )
+
+    console.print(tree)
+    console.print()
+
+
+def _print_cross_reference(result: ScanResult) -> None:
+    cr = result.cross_reference
+    if not (cr.confidence > 0 or cr.notes):
+        return
+    console.print()
+    conf_color = "green" if cr.confidence >= 70 else "yellow" if cr.confidence >= 40 else "red"
+    text = f"[bold]Guven Skoru:[/bold] [{conf_color}]{cr.confidence:.0f}%[/{conf_color}]\n"
+    for title, items in (
+        ("Eslesen Isimler", cr.matched_names),
+        ("Eslesen Konumlar", cr.matched_locations),
+        ("Eslesen Fotograflar", cr.matched_photos),
+        ("Notlar", cr.notes),
+    ):
+        if items:
+            text += f"\n[bold]{title}:[/bold]\n"
+            for item in items:
+                text += f"  • {item}\n"
+
+    console.print(
+        Panel(text, title="[bold]Capraz Referans Analizi[/bold]", border_style="magenta")
+    )
+
+
+def _print_emails(result: ScanResult) -> None:
+    if not result.emails:
+        return
+    console.print()
+    table = Table(
+        title="Bulunan Email'ler",
+        box=box.SIMPLE_HEAVY,
+        title_style="bold yellow",
+        header_style="bold",
+    )
+    table.add_column("Email", style="cyan")
+    table.add_column("Kaynak")
+    table.add_column("Dogrulanmis", justify="center")
+    table.add_column("Gravatar", justify="center")
+    table.add_column("Breach", justify="right")
+    for e in result.emails:
+        breach_cell = f"[bold red]{e.breach_count}[/bold red]" if e.breach_count else "[dim]0[/dim]"
+        table.add_row(
+            e.email,
+            e.source,
+            "[green]✓[/green]" if e.verified else "[red]✗[/red]",
+            "[green]✓[/green]" if e.gravatar else "[red]✗[/red]",
+            breach_cell,
+        )
+    console.print(table)
+
+    breached = [e for e in result.emails if e.breaches]
+    for e in breached:
+        btxt = f"[bold cyan]{e.email}[/bold cyan] — {len(e.breaches)} sizinti\n"
+        for b in e.breaches[:10]:
+            if isinstance(b, dict):
+                name = b.get("Name") or b.get("name", "?")
+                date = b.get("BreachDate") or b.get("breach_date", "")
+                pwn = b.get("PwnCount") or b.get("pwn_count", 0)
+                btxt += f"  • [red]{name}[/red] ({date}) — {pwn:,} hesap\n"
+            else:
+                btxt += f"  • {b}\n"
+        console.print(
+            Panel(btxt.rstrip(), title="[bold red]HIBP Breach[/bold red]", border_style="red")
+        )
+
+
+def _print_photo_matches(result: ScanResult) -> None:
+    if not result.photo_matches:
+        return
+    console.print()
+    table = Table(
+        title="Profil Fotograf Eslesmeleri",
+        box=box.SIMPLE_HEAVY,
+        title_style="bold magenta",
+        header_style="bold",
+    )
+    table.add_column("Platform A", style="cyan")
+    table.add_column("Platform B", style="cyan")
+    table.add_column("Benzerlik", justify="right")
+    table.add_column("Yontem", justify="center")
+    for m in result.photo_matches:
+        sim_color = "green" if m.similarity >= 0.9 else "yellow"
+        table.add_row(
+            m.platform_a,
+            m.platform_b,
+            f"[{sim_color}]{m.similarity:.0%}[/{sim_color}]",
+            m.method,
+        )
+    console.print(table)
+
+
+def _print_whois(result: ScanResult) -> None:
+    if not result.whois_records:
+        return
+    console.print()
+    table = Table(
+        title="WHOIS Kayitlari",
+        box=box.SIMPLE_HEAVY,
+        title_style="bold yellow",
+        header_style="bold",
+    )
+    table.add_column("Domain", style="cyan")
+    table.add_column("Kayitci")
+    table.add_column("Olusturulma")
+    table.add_column("Bitis")
+    table.add_column("Org")
+    for w in result.whois_records:
+        table.add_row(
+            str(w.get("domain", "")),
+            str(w.get("registrar", ""))[:30],
+            str(w.get("creation_date", ""))[:10],
+            str(w.get("expiration_date", ""))[:10],
+            str(w.get("org", ""))[:25],
+        )
+    console.print(table)
+
+
+def _print_dns(result: ScanResult) -> None:
+    if not result.dns_records:
+        return
+    console.print()
+    for domain, records in result.dns_records.items():
+        tree = Tree(f"[bold yellow]{domain}[/bold yellow] DNS")
+        for rtype, values in records.items():
+            if values:
+                branch = tree.add(f"[bold]{rtype}[/bold]")
+                for v in values[:10]:
+                    branch.add(f"[cyan]{v}[/cyan]")
+        console.print(tree)
+
+
+def _print_subdomains(result: ScanResult) -> None:
+    if not result.subdomains:
+        return
+    console.print()
+    unique_subs = sorted(set(result.subdomains))
+    shown = unique_subs[:50]
+    text = "\n".join(f"  • [cyan]{s}[/cyan]" for s in shown)
+    extra = f"\n  [dim]... ve {len(unique_subs) - 50} daha[/dim]" if len(unique_subs) > 50 else ""
+    console.print(
+        Panel(
+            text + extra,
+            title=f"[bold]Subdomain'ler ({len(unique_subs)})[/bold]",
+            border_style="blue",
+        )
+    )
+
+
+def _print_web_presence(result: ScanResult) -> None:
+    if not result.web_presence:
+        return
+    console.print()
+    table = Table(
+        title="Web Varligi",
+        box=box.SIMPLE_HEAVY,
+        title_style="bold blue",
+        header_style="bold",
+    )
+    table.add_column("Tur", min_width=12)
+    table.add_column("Detay", min_width=40)
+    for wp in result.web_presence:
+        wp_type = wp.get("type", "?")
+        if wp_type == "wayback":
+            detail = f"{wp.get('original_url', '')} → {wp.get('url', '')}"
+        elif wp_type == "domain_wayback":
+            detail = f"{wp.get('domain', '')} arsivde bulundu"
+        elif wp_type == "paste":
+            detail = f"Paste ID: {wp.get('id', '')} ({wp.get('time', '')})"
+        else:
+            detail = str(wp)
+        table.add_row(wp_type, detail)
+    console.print(table)
+
+
+def _print_variations(result: ScanResult) -> None:
+    if not result.variations_checked:
+        return
+    console.print()
+    shown = ", ".join(result.variations_checked[:10])
+    extra = (
+        f" ... ve {len(result.variations_checked) - 10} daha"
+        if len(result.variations_checked) > 10
+        else ""
+    )
+    console.print(f"  [dim]Kontrol edilen varyasyonlar: {shown}{extra}[/dim]")
+
+
+def _print_discovered_usernames(result: ScanResult) -> None:
+    if not result.discovered_usernames:
+        return
+    console.print()
+    console.print(
+        Panel(
+            "\n".join(f"  • [cyan]{u}[/cyan]" for u in result.discovered_usernames),
+            title="[bold]Kesfedilen Bagli Hesaplar[/bold]",
+            border_style="green",
+        )
+    )
