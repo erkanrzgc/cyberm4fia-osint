@@ -692,6 +692,16 @@ async def _phase_crypto(
     result.crypto_intel = list(intel)
 
 
+def _phase_enrichment(cfg: ScanConfig, result: ScanResult) -> None:
+    """Run synchronous enrichment (stylometry/language/timezone/graph)."""
+    if not cfg.enrichment:
+        return
+    from modules.analysis import run_enrichment
+
+    report = run_enrichment(result)
+    result.enrichment = report.to_dict()
+
+
 # ── Public entrypoint ────────────────────────────────────────────────────
 
 
@@ -730,6 +740,7 @@ async def run_scan(cfg: ScanConfig) -> ScanResult:
         await _phase_crypto(client, cfg, result)
 
     _finalize_cross_reference(result)
+    _phase_enrichment(cfg, result)
     result.scan_time = time.monotonic() - start_time
     return result
 

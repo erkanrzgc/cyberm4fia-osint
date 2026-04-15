@@ -84,6 +84,7 @@ class ScanConfig:
     phone: str | None = None
     phone_region: str | None = None
     crypto_addresses: tuple[str, ...] = ()
+    enrichment: bool = True
     proxy: str | None = None
     tor: bool = False
     categories: tuple[str, ...] | None = None
@@ -172,6 +173,7 @@ class ScanConfig:
             phone=phone,
             phone_region=phone_region,
             crypto_addresses=crypto_addresses,
+            enrichment=not getattr(args, "no_enrichment", False),
         )
 
     def mode_parts(self) -> list[str]:
@@ -195,6 +197,7 @@ class ScanConfig:
             (self.past_usernames, "PastUsernames"),
             (bool(self.phone), "Phone"),
             (bool(self.crypto_addresses), "Crypto"),
+            (self.enrichment, "Enrichment"),
             (self.tor, "Tor"),
         ]
         for flag, label in mapping:

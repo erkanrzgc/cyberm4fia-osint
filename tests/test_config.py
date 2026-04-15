@@ -110,5 +110,5 @@ class TestScanConfig:
         assert "Email" in parts
 
     def test_mode_parts_empty(self):
-        cfg = ScanConfig(username="a", deep=False)
+        cfg = ScanConfig(username="a", deep=False, enrichment=False)
         assert cfg.mode_parts() == []

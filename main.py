@@ -192,6 +192,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Comma-separated BTC/ETH addresses to enrich",
     )
+    p.add_argument(
+        "--no-enrichment",
+        dest="no_enrichment",
+        action="store_true",
+        help="Skip offline enrichment (stylometry/language/timezone/entity graph)",
+    )
     return p
 
 
