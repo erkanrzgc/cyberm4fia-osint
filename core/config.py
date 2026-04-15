@@ -79,6 +79,8 @@ class ScanConfig:
     recursive_depth: int = 1
     passive: bool = False
     passive_domain: str | None = None
+    reverse_image: bool = False
+    past_usernames: bool = False
     proxy: str | None = None
     tor: bool = False
     categories: tuple[str, ...] | None = None
@@ -111,12 +113,14 @@ class ScanConfig:
         recursive_depth = int(getattr(args, "recursive_depth", 1) or 1)
         passive = getattr(args, "passive", False) or full_default
         passive_domain = getattr(args, "domain", None)
+        reverse_image = getattr(args, "reverse_image", False) or full_default
+        past_usernames = getattr(args, "past_usernames", False) or full_default
 
         if args.full:
             deep = smart = email = web = True
             whois = breach = photo = dns = subdomain = True
             holehe = ghunt = toutatis = recursive = True
-            passive = True
+            passive = reverse_image = past_usernames = True
 
         if breach and not email:
             email = True
@@ -143,6 +147,8 @@ class ScanConfig:
             recursive_depth=recursive_depth,
             passive=passive,
             passive_domain=passive_domain,
+            reverse_image=reverse_image,
+            past_usernames=past_usernames,
             proxy=args.proxy,
             tor=args.tor,
             categories=categories,
@@ -171,6 +177,8 @@ class ScanConfig:
             (self.toutatis, "Toutatis"),
             (self.recursive, "Recursive"),
             (self.passive, "Passive"),
+            (self.reverse_image, "ReverseImage"),
+            (self.past_usernames, "PastUsernames"),
             (self.tor, "Tor"),
         ]
         for flag, label in mapping:

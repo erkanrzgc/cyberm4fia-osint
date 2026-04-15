@@ -159,6 +159,18 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Domain pivot for passive intel (e.g. example.com)",
     )
+    p.add_argument(
+        "--reverse-image",
+        dest="reverse_image",
+        action="store_true",
+        help="Run reverse image search on discovered profile pictures (Yandex + TinEye)",
+    )
+    p.add_argument(
+        "--past-usernames",
+        dest="past_usernames",
+        action="store_true",
+        help="Discover historical usernames via Wayback CDX",
+    )
     return p
 
 

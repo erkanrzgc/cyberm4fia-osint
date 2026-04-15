@@ -579,6 +579,63 @@ def _finalize_cross_reference(result: ScanResult) -> None:
     result.cross_reference = cr
 
 
+async def _phase_reverse_image(
+    client: HTTPClient,
+    cfg: ScanConfig,
+    result: ScanResult,
+) -> None:
+    """Reverse-image search on every avatar we harvested.
+
+    Pulls avatar URLs out of ``profile_data`` for each found platform.
+    We cap the input set to avoid racking up rate-limit hits against
+    Yandex when a target has 50+ profiles.
+    """
+    if not cfg.reverse_image:
+        return
+    from modules.reverse_image import run_reverse_image
+
+    image_urls: list[str] = []
+    seen: set[str] = set()
+    for r in result.platforms:
+        if not r.exists:
+            continue
+        for key in ("avatar", "profile_pic", "profile_image", "image", "photo"):
+            val = (r.profile_data or {}).get(key)
+            if isinstance(val, str) and val.startswith("http") and val not in seen:
+                seen.add(val)
+                image_urls.append(val)
+                if len(image_urls) >= 8:
+                    break
+        if len(image_urls) >= 8:
+            break
+
+    if not image_urls:
+        return
+    hits = await run_reverse_image(client, image_urls=image_urls)
+    result.reverse_image_hits = list(hits)
+
+
+async def _phase_username_history(
+    client: HTTPClient,
+    cfg: ScanConfig,
+    result: ScanResult,
+) -> None:
+    """Wayback-based historical alias discovery for found profile URLs."""
+    if not cfg.past_usernames:
+        return
+    from modules.history import discover_historical_usernames
+
+    profile_urls = [r.url for r in result.platforms if r.exists and r.url]
+    if not profile_urls:
+        return
+    hits = await discover_historical_usernames(
+        client,
+        profile_urls=profile_urls[:25],
+        current_username=cfg.username,
+    )
+    result.historical_usernames = list(hits)
+
+
 async def _phase_passive(
     client: HTTPClient,
     cfg: ScanConfig,
@@ -635,6 +692,8 @@ async def run_scan(cfg: ScanConfig) -> ScanResult:
         await _phase_whois(cfg, result)
         await _phase_dns_subdomain(client, cfg, result)
         await _phase_recursive(client, cfg, platforms, result)
+        await _phase_reverse_image(client, cfg, result)
+        await _phase_username_history(client, cfg, result)
         await _phase_passive(client, cfg, result)
 
     _finalize_cross_reference(result)

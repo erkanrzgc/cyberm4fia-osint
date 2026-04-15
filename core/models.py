@@ -84,6 +84,8 @@ class ScanResult:
     ghunt_results: list = field(default_factory=list)  # GHuntResult entries
     toutatis_results: list = field(default_factory=list)  # ToutatisResult entries
     passive_hits: list = field(default_factory=list)  # PassiveHit entries
+    reverse_image_hits: list = field(default_factory=list)  # ReverseImageHit
+    historical_usernames: list = field(default_factory=list)  # HistoricalUsername
     scan_time: float = 0.0
     ai_report: dict | None = None
 
@@ -206,6 +208,14 @@ class ScanResult:
             "passive_hits": [
                 hit.to_dict() if hasattr(hit, "to_dict") else hit
                 for hit in self.passive_hits
+            ],
+            "reverse_image_hits": [
+                hit.to_dict() if hasattr(hit, "to_dict") else hit
+                for hit in self.reverse_image_hits
+            ],
+            "historical_usernames": [
+                h.to_dict() if hasattr(h, "to_dict") else h
+                for h in self.historical_usernames
             ],
             "ai_report": self.ai_report,
         }
