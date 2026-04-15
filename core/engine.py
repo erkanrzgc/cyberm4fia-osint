@@ -579,6 +579,31 @@ def _finalize_cross_reference(result: ScanResult) -> None:
     result.cross_reference = cr
 
 
+async def _phase_passive(
+    client: HTTPClient,
+    cfg: ScanConfig,
+    result: ScanResult,
+) -> None:
+    """Run passive intel sources (shodan/censys/fofa/zoomeye/pastebin/…).
+
+    Domain-keyed sources run when ``cfg.passive_domain`` is set; username
+    and profile-URL sources run regardless. The orchestrator swallows
+    per-source failures, so this phase is always best-effort.
+    """
+    if not cfg.passive:
+        return
+    from modules.passive import run_passive
+
+    profile_urls = [r.url for r in result.platforms if r.exists and r.url]
+    hits = await run_passive(
+        client,
+        username=cfg.username,
+        domain=cfg.passive_domain,
+        profile_urls=profile_urls[:10],  # cap wayback fan-out
+    )
+    result.passive_hits = list(hits)
+
+
 # ── Public entrypoint ────────────────────────────────────────────────────
 
 
@@ -610,6 +635,7 @@ async def run_scan(cfg: ScanConfig) -> ScanResult:
         await _phase_whois(cfg, result)
         await _phase_dns_subdomain(client, cfg, result)
         await _phase_recursive(client, cfg, platforms, result)
+        await _phase_passive(client, cfg, result)
 
     _finalize_cross_reference(result)
     result.scan_time = time.monotonic() - start_time

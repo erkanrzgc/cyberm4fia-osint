@@ -83,6 +83,7 @@ class ScanResult:
     holehe_hits: list = field(default_factory=list)  # HoleheHit entries
     ghunt_results: list = field(default_factory=list)  # GHuntResult entries
     toutatis_results: list = field(default_factory=list)  # ToutatisResult entries
+    passive_hits: list = field(default_factory=list)  # PassiveHit entries
     scan_time: float = 0.0
     ai_report: dict | None = None
 
@@ -201,6 +202,10 @@ class ScanResult:
                     "profile_pic": t.profile_pic,
                 }
                 for t in self.toutatis_results
+            ],
+            "passive_hits": [
+                hit.to_dict() if hasattr(hit, "to_dict") else hit
+                for hit in self.passive_hits
             ],
             "ai_report": self.ai_report,
         }

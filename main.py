@@ -147,6 +147,18 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Enable headless Chromium fallback for JS-rendered profiles",
     )
+    p.add_argument(
+        "--passive",
+        action="store_true",
+        help="Run passive intel sources (Shodan/Censys/FOFA/ZoomEye/Pastebin/Ahmia/Wayback)",
+    )
+    p.add_argument(
+        "--domain",
+        dest="domain",
+        type=str,
+        default=None,
+        help="Domain pivot for passive intel (e.g. example.com)",
+    )
     return p
 
 
