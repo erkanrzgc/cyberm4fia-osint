@@ -81,6 +81,9 @@ class ScanConfig:
     passive_domain: str | None = None
     reverse_image: bool = False
     past_usernames: bool = False
+    phone: str | None = None
+    phone_region: str | None = None
+    crypto_addresses: tuple[str, ...] = ()
     proxy: str | None = None
     tor: bool = False
     categories: tuple[str, ...] | None = None
@@ -115,6 +118,14 @@ class ScanConfig:
         passive_domain = getattr(args, "domain", None)
         reverse_image = getattr(args, "reverse_image", False) or full_default
         past_usernames = getattr(args, "past_usernames", False) or full_default
+        phone = getattr(args, "phone", None)
+        phone_region = getattr(args, "phone_region", None)
+        raw_crypto = getattr(args, "crypto", None)
+        crypto_addresses: tuple[str, ...] = ()
+        if raw_crypto:
+            crypto_addresses = tuple(
+                addr.strip() for addr in raw_crypto.split(",") if addr.strip()
+            )
 
         if args.full:
             deep = smart = email = web = True
@@ -158,6 +169,9 @@ class ScanConfig:
             new_circuit_every=int(getattr(args, "new_circuit_every", 0) or 0),
             tor_control_password=getattr(args, "tor_control_password", None),
             playwright=getattr(args, "playwright", False),
+            phone=phone,
+            phone_region=phone_region,
+            crypto_addresses=crypto_addresses,
         )
 
     def mode_parts(self) -> list[str]:
@@ -179,6 +193,8 @@ class ScanConfig:
             (self.passive, "Passive"),
             (self.reverse_image, "ReverseImage"),
             (self.past_usernames, "PastUsernames"),
+            (bool(self.phone), "Phone"),
+            (bool(self.crypto_addresses), "Crypto"),
             (self.tor, "Tor"),
         ]
         for flag, label in mapping:

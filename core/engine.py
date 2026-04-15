@@ -661,6 +661,37 @@ async def _phase_passive(
     result.passive_hits = list(hits)
 
 
+async def _phase_phone(
+    client: HTTPClient,
+    cfg: ScanConfig,
+    result: ScanResult,
+) -> None:
+    """Offline + NumVerify metadata for a user-supplied phone number."""
+    if not cfg.phone:
+        return
+    from modules.phone import lookup_phone
+
+    intel = await lookup_phone(
+        client, cfg.phone, default_region=cfg.phone_region
+    )
+    if intel is not None:
+        result.phone_intel = [intel]
+
+
+async def _phase_crypto(
+    client: HTTPClient,
+    cfg: ScanConfig,
+    result: ScanResult,
+) -> None:
+    """Balance/tx lookups for user-supplied BTC/ETH addresses."""
+    if not cfg.crypto_addresses:
+        return
+    from modules.crypto import lookup_crypto
+
+    intel = await lookup_crypto(client, list(cfg.crypto_addresses))
+    result.crypto_intel = list(intel)
+
+
 # ── Public entrypoint ────────────────────────────────────────────────────
 
 
@@ -695,6 +726,8 @@ async def run_scan(cfg: ScanConfig) -> ScanResult:
         await _phase_reverse_image(client, cfg, result)
         await _phase_username_history(client, cfg, result)
         await _phase_passive(client, cfg, result)
+        await _phase_phone(client, cfg, result)
+        await _phase_crypto(client, cfg, result)
 
     _finalize_cross_reference(result)
     result.scan_time = time.monotonic() - start_time

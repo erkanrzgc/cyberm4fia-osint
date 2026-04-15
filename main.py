@@ -171,6 +171,27 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Discover historical usernames via Wayback CDX",
     )
+    p.add_argument(
+        "--phone",
+        dest="phone",
+        type=str,
+        default=None,
+        help="Phone number to enrich (E.164 preferred, e.g. +14155552671)",
+    )
+    p.add_argument(
+        "--phone-region",
+        dest="phone_region",
+        type=str,
+        default=None,
+        help="Default ISO region for --phone (e.g. US, TR) when not E.164",
+    )
+    p.add_argument(
+        "--crypto",
+        dest="crypto",
+        type=str,
+        default=None,
+        help="Comma-separated BTC/ETH addresses to enrich",
+    )
     return p
 
 

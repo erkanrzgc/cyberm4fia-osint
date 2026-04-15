@@ -86,6 +86,8 @@ class ScanResult:
     passive_hits: list = field(default_factory=list)  # PassiveHit entries
     reverse_image_hits: list = field(default_factory=list)  # ReverseImageHit
     historical_usernames: list = field(default_factory=list)  # HistoricalUsername
+    phone_intel: list = field(default_factory=list)  # PhoneIntel entries
+    crypto_intel: list = field(default_factory=list)  # CryptoIntel entries
     scan_time: float = 0.0
     ai_report: dict | None = None
 
@@ -216,6 +218,14 @@ class ScanResult:
             "historical_usernames": [
                 h.to_dict() if hasattr(h, "to_dict") else h
                 for h in self.historical_usernames
+            ],
+            "phone_intel": [
+                p.to_dict() if hasattr(p, "to_dict") else p
+                for p in self.phone_intel
+            ],
+            "crypto_intel": [
+                c.to_dict() if hasattr(c, "to_dict") else c
+                for c in self.crypto_intel
             ],
             "ai_report": self.ai_report,
         }
