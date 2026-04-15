@@ -9,11 +9,14 @@ import sys
 import time
 from datetime import datetime, timezone
 
+from core import watchlist
+from core.bulk import load_usernames_from_file, run_bulk
 from core.config import ScanConfig
 from core.engine import run_scan
 from core.graph_export import export_dot
 from core.history import diff_entries, get_latest, list_scans, save_scan
 from core.logging_setup import configure_logging, get_logger
+from core.plugins import load_plugins
 from core.reporter import (
     console,
     export_html,
@@ -38,7 +41,12 @@ def build_parser() -> argparse.ArgumentParser:
         prog="cyberm4fia-osint",
         description="OSINT intelligence gathering tool",
     )
-    p.add_argument("username", help="Username to search for")
+    p.add_argument(
+        "username",
+        nargs="?",
+        default=None,
+        help="Username to search for (optional when using --watchlist-* or --bulk)",
+    )
     p.add_argument(
         "--smart", "-s", action="store_true",
         help="Smart search: username variations + discovered accounts",
@@ -198,6 +206,30 @@ def build_parser() -> argparse.ArgumentParser:
         help="Comma-separated BTC/ETH addresses to enrich",
     )
     p.add_argument(
+        "--watchlist-add", dest="watchlist_add", type=str, default=None,
+        help="Add a username to the watchlist and exit",
+    )
+    p.add_argument(
+        "--watchlist-remove", dest="watchlist_remove", type=str, default=None,
+        help="Remove a username from the watchlist and exit",
+    )
+    p.add_argument(
+        "--watchlist-list", dest="watchlist_list", action="store_true",
+        help="List watchlist entries and exit",
+    )
+    p.add_argument(
+        "--watchlist-scan", dest="watchlist_scan", action="store_true",
+        help="Run a scan for every username in the watchlist",
+    )
+    p.add_argument(
+        "--bulk", dest="bulk", type=str, default=None,
+        help="Path to a newline-delimited file of usernames to scan in bulk",
+    )
+    p.add_argument(
+        "--bulk-parallel", dest="bulk_parallel", type=int, default=3,
+        help="Concurrency cap for --bulk / --watchlist-scan (default 3)",
+    )
+    p.add_argument(
         "--no-enrichment",
         dest="no_enrichment",
         action="store_true",
@@ -287,11 +319,106 @@ def _save_report(result, path: str) -> None:
         export_json(result, path + ".json")
 
 
+def _handle_watchlist_commands(args) -> bool:
+    """Handle --watchlist-* commands. Returns True if one was executed."""
+    if args.watchlist_add:
+        entry = watchlist.add(args.watchlist_add)
+        console.print(
+            f"  [green]Added[/green] [bold]{entry.username}[/bold] to watchlist "
+            f"(id={entry.id})"
+        )
+        return True
+    if args.watchlist_remove:
+        ok = watchlist.remove(args.watchlist_remove)
+        color = "green" if ok else "yellow"
+        verb = "Removed" if ok else "Not found"
+        console.print(
+            f"  [{color}]{verb}[/{color}] [bold]{args.watchlist_remove}[/bold]"
+        )
+        return True
+    if args.watchlist_list:
+        entries = watchlist.list_all()
+        if not entries:
+            console.print("  [yellow]Watchlist is empty.[/yellow]")
+            return True
+        console.print(f"\n  [bold]Watchlist[/bold] ({len(entries)} entries)")
+        for e in entries:
+            last = _fmt_ts(e.last_scan_at) if e.last_scan_at else "never"
+            tag_str = ",".join(e.tags) if e.tags else "-"
+            console.print(
+                f"    [cyan]#{e.id}[/cyan] {e.username}  "
+                f"added:{_fmt_ts(e.added_at)}  last:{last}  tags:{tag_str}"
+            )
+        return True
+    return False
+
+
+async def _run_bulk_mode(usernames: list[str], args, from_watchlist: bool) -> None:
+    if not usernames:
+        console.print("  [yellow]No usernames to scan.[/yellow]")
+        return
+
+    template_ns = argparse.Namespace(**vars(args))
+    template_ns.username = usernames[0]
+    cfg_template = ScanConfig.from_args(template_ns, usernames[0])
+
+    print_banner()
+    console.print(
+        f"  [bold]Bulk scan[/bold]: {len(usernames)} targets, "
+        f"parallel={args.bulk_parallel}"
+    )
+
+    results = await run_bulk(
+        usernames, cfg_template, max_parallel=args.bulk_parallel
+    )
+    plugin_registry = load_plugins()
+
+    for username, result in zip(usernames, results, strict=True):
+        print_results(result)
+        if not args.no_history:
+            try:
+                save_scan(result.to_dict(), ts=int(time.time()))
+            except (OSError, ValueError) as exc:
+                log.warning("history: save failed for %s: %s", username, exc)
+        if from_watchlist:
+            try:
+                watchlist.mark_scanned(username)
+            except Exception as exc:  # noqa: BLE001
+                log.warning("watchlist mark_scanned failed: %s", exc)
+        try:
+            plugin_registry.run_post_scan(
+                result, ScanConfig(username=username)
+            )
+        except Exception as exc:  # noqa: BLE001
+            log.warning("plugin hooks failed for %s: %s", username, exc)
+
+    console.print(
+        f"\n  [bold green]Bulk complete[/bold green]: {len(results)} scans"
+    )
+
+
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
 
     configure_logging(args.log_level)
+
+    if _handle_watchlist_commands(args):
+        return
+
+    if args.watchlist_scan:
+        usernames = [e.username for e in watchlist.list_all()]
+        asyncio.run(_run_bulk_mode(usernames, args, from_watchlist=True))
+        return
+
+    if args.bulk:
+        usernames = load_usernames_from_file(args.bulk)
+        asyncio.run(_run_bulk_mode(usernames, args, from_watchlist=False))
+        return
+
+    if args.username is None:
+        console.print("[red]Error: please provide a valid username.[/red]")
+        sys.exit(1)
 
     username = sanitize_username(args.username)
     if not username:
@@ -336,6 +463,12 @@ def main() -> None:
 
     if args.output:
         _save_report(result, args.output)
+
+    try:
+        plugin_registry = load_plugins()
+        plugin_registry.run_post_scan(result, cfg)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("plugin hooks failed: %s", exc)
 
 
 if __name__ == "__main__":
