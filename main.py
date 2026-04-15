@@ -18,6 +18,11 @@ from core.reporter import (
     console,
     export_html,
     export_json,
+    export_misp,
+    export_obsidian,
+    export_pdf,
+    export_stix,
+    pdf_available,
     print_banner,
     print_results,
     print_scan_start,
@@ -92,7 +97,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--proxy", type=str, default=None, help="Proxy address")
     p.add_argument(
         "--output", "-o", type=str, default=None,
-        help="Save results to file (.json or .html)",
+        help="Save results (.json/.html/.pdf/.dot/.misp.json/.stix.json or dir ending with / for Obsidian vault)",
     )
     p.add_argument("--timeout", "-t", type=int, default=None, help="Request timeout (seconds)")
     p.add_argument(
@@ -254,12 +259,30 @@ def _print_diff(username: str, result) -> None:
 
 
 def _save_report(result, path: str) -> None:
-    if path.endswith(".json"):
+    lower = path.lower()
+    if lower.endswith(".json"):
         export_json(result, path)
-    elif path.endswith(".html"):
+    elif lower.endswith(".html"):
         export_html(result, path)
-    elif path.endswith(".dot"):
+    elif lower.endswith(".dot"):
         export_dot(result, path)
+    elif lower.endswith(".pdf"):
+        if not pdf_available():
+            console.print(
+                "  [yellow]reportlab not installed; skipping PDF export.[/yellow]"
+            )
+            return
+        export_pdf(result, path)
+        console.print(f"  [green]PDF rapor kaydedildi:[/green] {path}")
+    elif lower.endswith(".misp.json"):
+        export_misp(result, path)
+        console.print(f"  [green]MISP event kaydedildi:[/green] {path}")
+    elif lower.endswith(".stix.json"):
+        export_stix(result, path)
+        console.print(f"  [green]STIX bundle kaydedildi:[/green] {path}")
+    elif lower.endswith("/") or lower.endswith(".obsidian"):
+        export_obsidian(result, path.rstrip("/"))
+        console.print(f"  [green]Obsidian vault kaydedildi:[/green] {path}")
     else:
         export_json(result, path + ".json")
 
