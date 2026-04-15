@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import asyncio
 import itertools
-import random
 import time
 from collections import defaultdict
 from urllib.parse import urlparse
@@ -27,9 +26,10 @@ from core.config import (
     REQUEST_TIMEOUT,
     RETRY_COUNT,
     RETRY_DELAY,
-    USER_AGENTS,
 )
 from core.logging_setup import get_logger
+from modules.stealth import DomainRateBucket, fingerprint_headers, pick_ua
+from modules.stealth.tor_control import CircuitRotator
 
 log = get_logger(__name__)
 
@@ -41,6 +41,11 @@ class HTTPClient:
         proxies: list[str] | None = None,
         tor: bool = False,
         request_timeout: int | None = None,
+        *,
+        fingerprint: bool = True,
+        rate_bucket: DomainRateBucket | None = None,
+        new_circuit_every: int = 0,
+        tor_control_password: str | None = None,
     ) -> None:
         if tor:
             self.proxies = ["socks5://127.0.0.1:9050"]
@@ -57,6 +62,13 @@ class HTTPClient:
         )
         self._session: aiohttp.ClientSession | None = None
         self._request_timeout = request_timeout or REQUEST_TIMEOUT
+        self._fingerprint = fingerprint
+        self._rate_bucket = rate_bucket if rate_bucket is not None else DomainRateBucket()
+        self._rotator: CircuitRotator | None = (
+            CircuitRotator(every=new_circuit_every, password=tor_control_password)
+            if tor and new_circuit_every > 0
+            else None
+        )
 
     async def __aenter__(self) -> HTTPClient:
         timeout = aiohttp.ClientTimeout(total=self._request_timeout)
@@ -87,35 +99,59 @@ class HTTPClient:
         proxy = next(self._proxy_cycle)
         return None if proxy.startswith("socks") else proxy
 
-    def _random_ua(self) -> str:
-        return random.choice(USER_AGENTS)  # nosec B311 - UA rotation, not cryptographic
-
     def _require_session(self) -> aiohttp.ClientSession:
         if self._session is None:
             raise RuntimeError("HTTPClient must be used as an async context manager")
         return self._session
 
     def _headers(self, extra: dict | None = None) -> dict:
-        merged = {
-            "User-Agent": self._random_ua(),
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.9",
-            "Accept-Encoding": "gzip, deflate",
-            "Connection": "keep-alive",
-        }
+        ua_entry = pick_ua()
+        if self._fingerprint:
+            merged: dict = dict(fingerprint_headers(ua_entry))
+        else:
+            merged = {
+                "User-Agent": ua_entry.ua,
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Accept-Encoding": "gzip, deflate",
+                "Connection": "keep-alive",
+            }
         if extra:
             merged.update(extra)
         return merged
 
+    def _host(self, url: str) -> str:
+        return urlparse(url).netloc or url
+
     def _host_lock(self, url: str) -> asyncio.Semaphore:
-        host = urlparse(url).netloc or url
-        return self._host_semaphores[host]
+        return self._host_semaphores[self._host(url)]
 
     async def _acquire(self, url: str) -> tuple[asyncio.Semaphore, asyncio.Semaphore]:
         host_lock = self._host_lock(url)
         await self._semaphore.acquire()
         await host_lock.acquire()
+        await self._rate_bucket.acquire(self._host(url))
         return self._semaphore, host_lock
+
+    @staticmethod
+    def _retry_after(resp: aiohttp.ClientResponse) -> float | None:
+        raw = resp.headers.get("Retry-After")
+        if not raw:
+            return None
+        try:
+            return float(raw)
+        except ValueError:
+            return None
+
+    async def _post_request(self, url: str, status: int, resp: aiohttp.ClientResponse | None) -> None:
+        host = self._host(url)
+        if status in (429, 503):
+            retry_after = self._retry_after(resp) if resp is not None else None
+            await self._rate_bucket.record_throttled(host, retry_after=retry_after)
+        elif 200 <= status < 400:
+            await self._rate_bucket.record_success(host)
+        if self._rotator is not None:
+            await self._rotator.tick()
 
     # ── request methods ────────────────────────────────────────
 
@@ -140,6 +176,7 @@ class HTTPClient:
                     ) as resp:
                         elapsed = time.monotonic() - start
                         body = await resp.text(errors="replace")
+                        await self._post_request(url, resp.status, resp)
                         return resp.status, body, elapsed
                 except asyncio.TimeoutError:
                     elapsed = time.monotonic() - start
@@ -174,6 +211,7 @@ class HTTPClient:
                         proxy=self._next_http_proxy(),
                     ) as resp:
                         elapsed = time.monotonic() - start
+                        await self._post_request(url, resp.status, resp)
                         if resp.status == 200:
                             data = await resp.json(content_type=None)
                             return resp.status, data, elapsed
@@ -210,6 +248,7 @@ class HTTPClient:
                         proxy=self._next_http_proxy(),
                     ) as resp:
                         elapsed = time.monotonic() - start
+                        await self._post_request(url, resp.status, resp)
                         if resp.status == 200:
                             data = await resp.read()
                             return resp.status, data, elapsed

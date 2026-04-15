@@ -122,6 +122,31 @@ def build_parser() -> argparse.ArgumentParser:
         "--ai", action="store_true",
         help="Analyze scan results with a local LLM (requires a GGUF model)",
     )
+    p.add_argument(
+        "--no-fingerprint",
+        dest="no_fingerprint",
+        action="store_true",
+        help="Disable browser-consistent sec-ch-ua/sec-fetch fingerprint headers",
+    )
+    p.add_argument(
+        "--new-circuit-every",
+        dest="new_circuit_every",
+        type=int,
+        default=0,
+        help="Rotate Tor circuit every N requests (requires --tor and stem)",
+    )
+    p.add_argument(
+        "--tor-control-password",
+        dest="tor_control_password",
+        type=str,
+        default=None,
+        help="Password for the Tor control port (optional)",
+    )
+    p.add_argument(
+        "--playwright",
+        action="store_true",
+        help="Enable headless Chromium fallback for JS-rendered profiles",
+    )
     return p
 
 

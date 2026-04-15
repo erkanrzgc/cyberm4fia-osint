@@ -589,7 +589,12 @@ async def run_scan(cfg: ScanConfig) -> ScanResult:
     platforms = _select_platforms(cfg.categories)
 
     async with HTTPClient(
-        proxy=cfg.proxy, tor=cfg.tor, request_timeout=cfg.request_timeout
+        proxy=cfg.proxy,
+        tor=cfg.tor,
+        request_timeout=cfg.request_timeout,
+        fingerprint=cfg.fingerprint,
+        new_circuit_every=cfg.new_circuit_every,
+        tor_control_password=cfg.tor_control_password,
     ) as client:
         if cfg.breach and not hibp_available():
             console.print(

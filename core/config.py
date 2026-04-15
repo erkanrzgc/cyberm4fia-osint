@@ -82,6 +82,10 @@ class ScanConfig:
     categories: tuple[str, ...] | None = None
     request_timeout: int = REQUEST_TIMEOUT
     fp_threshold: float = 0.45  # drop matches below this confidence
+    fingerprint: bool = True
+    new_circuit_every: int = 0
+    tor_control_password: str | None = None
+    playwright: bool = False
 
     @classmethod
     def from_args(cls, args, username: str) -> ScanConfig:
@@ -137,6 +141,10 @@ class ScanConfig:
             categories=categories,
             request_timeout=args.timeout or REQUEST_TIMEOUT,
             fp_threshold=getattr(args, "fp_threshold", None) or 0.45,
+            fingerprint=not getattr(args, "no_fingerprint", False),
+            new_circuit_every=int(getattr(args, "new_circuit_every", 0) or 0),
+            tor_control_password=getattr(args, "tor_control_password", None),
+            playwright=getattr(args, "playwright", False),
         )
 
     def mode_parts(self) -> list[str]:
