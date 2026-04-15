@@ -206,6 +206,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="Comma-separated BTC/ETH addresses to enrich",
     )
     p.add_argument(
+        "--serve", action="store_true",
+        help="Start the FastAPI REST server (requires fastapi + uvicorn)",
+    )
+    p.add_argument(
+        "--host", type=str, default="127.0.0.1",
+        help="Bind host for --serve (default 127.0.0.1)",
+    )
+    p.add_argument(
+        "--port", type=int, default=8000,
+        help="Bind port for --serve (default 8000)",
+    )
+    p.add_argument(
         "--watchlist-add", dest="watchlist_add", type=str, default=None,
         help="Add a username to the watchlist and exit",
     )
@@ -402,6 +414,21 @@ def main() -> None:
     args = parser.parse_args()
 
     configure_logging(args.log_level)
+
+    if args.serve:
+        from core.api import is_available as api_available
+        if not api_available():
+            console.print(
+                "  [red]--serve requires 'fastapi' and 'uvicorn'. "
+                "Install with: pip install fastapi uvicorn[/red]"
+            )
+            sys.exit(1)
+        from core.api.server import serve
+        console.print(
+            f"  [cyan]Starting API on http://{args.host}:{args.port}[/cyan]"
+        )
+        serve(host=args.host, port=args.port)
+        return
 
     if _handle_watchlist_commands(args):
         return

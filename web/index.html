@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>cyberm4fia-osint</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="hero">
+    <h1>cyberm4fia<span class="accent">·osint</span></h1>
+    <p class="tag">terminal-first OSINT reconnaissance — web control surface</p>
+  </header>
+
+  <main>
+    <section class="panel">
+      <h2>Run a scan</h2>
+      <form id="scan-form">
+        <div class="row">
+          <label>username<input name="username" required placeholder="alice" /></label>
+          <label>categories<input name="categories" placeholder="social,dev (optional)" /></label>
+        </div>
+        <div class="checkbox-grid">
+          <label><input type="checkbox" name="email" /> email</label>
+          <label><input type="checkbox" name="breach" /> breach</label>
+          <label><input type="checkbox" name="web" /> web</label>
+          <label><input type="checkbox" name="whois" /> whois</label>
+          <label><input type="checkbox" name="dns" /> dns</label>
+          <label><input type="checkbox" name="subdomain" /> subdomain</label>
+          <label><input type="checkbox" name="photo" /> photo</label>
+          <label><input type="checkbox" name="recursive" /> recursive</label>
+          <label><input type="checkbox" name="passive" /> passive</label>
+          <label><input type="checkbox" name="reverse_image" /> reverse-image</label>
+          <label><input type="checkbox" name="past_usernames" /> past-usernames</label>
+          <label><input type="checkbox" name="tor" /> tor</label>
+        </div>
+        <button type="submit">Scan</button>
+      </form>
+      <div id="scan-status"></div>
+      <pre id="scan-output"></pre>
+    </section>
+
+    <section class="panel">
+      <h2>Watchlist</h2>
+      <form id="watch-form" class="row">
+        <input name="username" placeholder="username" required />
+        <input name="tags" placeholder="tags (comma)" />
+        <button type="submit">Add</button>
+      </form>
+      <ul id="watch-list"></ul>
+    </section>
+  </main>
+
+  <footer>
+    <small>API docs: <a href="/docs">/docs</a></small>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
