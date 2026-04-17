@@ -132,10 +132,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Do not persist this scan to history",
     )
     p.add_argument(
-        "--no-ai", dest="no_ai", action="store_true",
-        help="Skip AI analysis even when a local LLM model is available",
-    )
-    p.add_argument(
         "--no-fingerprint",
         dest="no_fingerprint",
         action="store_true",
@@ -479,8 +475,7 @@ def main() -> None:
         console.print("\n\n  [yellow]Scan cancelled.[/yellow]")
         sys.exit(0)
 
-    if not args.no_ai:
-        _run_ai_analysis(result)
+    _run_ai_analysis(result)
 
     print_results(result)
 
