@@ -132,8 +132,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="Do not persist this scan to history",
     )
     p.add_argument(
-        "--ai", action="store_true",
-        help="Analyze scan results with a local LLM (requires a GGUF model)",
+        "--no-ai", dest="no_ai", action="store_true",
+        help="Skip AI analysis even when a local LLM model is available",
     )
     p.add_argument(
         "--no-fingerprint",
@@ -265,17 +265,22 @@ def _show_history(username: str) -> None:
 
 
 def _run_ai_analysis(result) -> None:
+    """Run AI analysis if a local LLM is available — skip silently if not."""
     try:
         from core.analysis import LLMAnalyzer, LLMUnavailable
-    except ImportError as exc:
-        console.print(f"  [red]AI module failed to load: {exc}[/red]")
+    except ImportError:
+        log.debug("AI module not importable — skipping")
+        return
+    try:
+        analyzer = LLMAnalyzer.from_env()
+    except LLMUnavailable:
+        log.debug("no GGUF model configured — skipping AI analysis")
         return
     console.print("  [cyan]Running AI analysis (local LLM)...[/cyan]")
     try:
-        analyzer = LLMAnalyzer.from_env()
         report = analyzer.analyze(result.to_dict())
-    except LLMUnavailable as exc:
-        console.print(f"  [yellow]AI analysis skipped: {exc}[/yellow]")
+    except Exception as exc:  # noqa: BLE001
+        log.warning("AI analysis failed: %s", exc)
         return
     result.ai_report = report.to_dict()
 
@@ -474,7 +479,7 @@ def main() -> None:
         console.print("\n\n  [yellow]Scan cancelled.[/yellow]")
         sys.exit(0)
 
-    if args.ai:
+    if not args.no_ai:
         _run_ai_analysis(result)
 
     print_results(result)
