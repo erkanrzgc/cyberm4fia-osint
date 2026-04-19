@@ -107,3 +107,58 @@ def test_history_endpoints_missing_user(client: TestClient, monkeypatch) -> None
 
 def test_is_available_true_when_deps_installed() -> None:
     assert api.is_available() is True
+
+
+def test_scan_stream_emits_events(client: TestClient) -> None:
+    with client.stream(
+        "POST",
+        "/scan/stream",
+        json={"username": "eve", "save_history": False},
+    ) as r:
+        assert r.status_code == 200
+        assert r.headers["content-type"].startswith("text/event-stream")
+        body = b"".join(r.iter_bytes())
+    text = body.decode()
+    # At least the terminal result event must arrive.
+    assert "\"kind\": \"result\"" in text
+    assert "eve" in text
+
+
+def test_graph_404_when_no_history(client: TestClient, monkeypatch) -> None:
+    monkeypatch.setattr(api_server, "get_latest", lambda u, before_id=None: None)
+    r = client.get("/graph/ghost")
+    assert r.status_code == 404
+
+
+def test_graph_returns_cytoscape_payload(client: TestClient, monkeypatch) -> None:
+    from core.history import HistoryEntry
+
+    payload = {
+        "username": "mallory",
+        "platforms": [
+            {
+                "platform": "GitHub",
+                "url": "https://github.com/mallory",
+                "category": "dev",
+                "exists": True,
+                "confidence": 0.9,
+            }
+        ],
+        "emails": [{"email": "m@e.com", "source": "github", "breaches": ["LinkedIn"]}],
+    }
+    entry = HistoryEntry(id=1, username="mallory", ts=1, found_count=1, payload=payload)
+    monkeypatch.setattr(api_server, "get_latest", lambda u, before_id=None: entry)
+
+    r = client.get("/graph/mallory")
+    assert r.status_code == 200
+    data = r.json()
+    ids = {n["data"]["id"] for n in data["nodes"]}
+    assert "mallory" in ids
+    assert "platform::GitHub" in ids
+    assert "email::m@e.com" in ids
+    assert "breach::LinkedIn" in ids
+    # Edges must include the root→platform relation.
+    assert any(
+        e["data"]["source"] == "mallory" and e["data"]["target"] == "platform::GitHub"
+        for e in data["edges"]
+    )

@@ -8,22 +8,25 @@ and the API is a supplementary surface.
 
 from __future__ import annotations
 
+import asyncio
+import json
 import time
-from dataclasses import replace
 from pathlib import Path
-from typing import Any
+from typing import Any, AsyncIterator
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from core import watchlist
+from core.api.cytoscape import payload_to_cytoscape
 from core.config import ScanConfig
 from core.engine import run_scan
 from core.history import diff_entries, get_latest, list_scans, save_scan
 from core.logging_setup import get_logger
+from core.progress import ProgressEmitter, set_emitter
 
 log = get_logger(__name__)
 
@@ -122,6 +125,62 @@ def build_app() -> FastAPI:
             except (OSError, ValueError) as exc:
                 log.warning("history: save failed: %s", exc)
         return payload
+
+    @app.post("/scan/stream")
+    async def scan_stream(req: ScanRequest) -> StreamingResponse:
+        cfg = _cfg_from_request(req)
+        emitter = ProgressEmitter()
+        queue = emitter.subscribe()
+
+        async def _runner() -> None:
+            set_emitter(emitter)
+            try:
+                try:
+                    result = await run_scan(cfg)
+                except Exception as exc:  # noqa: BLE001
+                    log.exception("streamed scan failed for %s", req.username)
+                    emitter.emit_error(str(exc))
+                    return
+                payload = result.to_dict()
+                if req.save_history:
+                    try:
+                        save_scan(payload, ts=int(time.time()))
+                    except (OSError, ValueError) as exc:
+                        log.warning("history: save failed: %s", exc)
+                emitter.emit_result(payload)
+            finally:
+                set_emitter(None)
+                emitter.close()
+
+        task = asyncio.create_task(_runner())
+
+        async def _stream() -> AsyncIterator[bytes]:
+            try:
+                while True:
+                    event = await queue.get()
+                    if event is None:
+                        break
+                    yield f"data: {json.dumps(event.to_dict())}\n\n".encode()
+                    if event.kind in {"done", "error", "result"}:
+                        # keep draining until emitter closes so result/done both flow
+                        continue
+            finally:
+                if not task.done():
+                    task.cancel()
+
+        return StreamingResponse(_stream(), media_type="text/event-stream")
+
+    @app.get("/graph/{username}")
+    def graph(username: str) -> dict[str, Any]:
+        entry = get_latest(username)
+        if entry is None:
+            raise HTTPException(status_code=404, detail="no scans for user")
+        return {
+            "username": username,
+            "scan_id": entry.id,
+            "ts": entry.ts,
+            **payload_to_cytoscape(entry.payload),
+        }
 
     @app.get("/history/{username}")
     def history(username: str, limit: int = 20) -> dict[str, Any]:

@@ -135,3 +135,62 @@ button:active { transform: translateY(0); }
 
 footer { padding: 2rem; text-align: center; color: var(--muted); }
 footer a { color: var(--accent); text-decoration: none; }
+
+.row label.inline { flex-direction: row; align-items: center; gap: 0.4rem; color: var(--text); font-size: 0.85rem; min-width: auto; }
+
+#scan-progress {
+  margin-top: 0.75rem;
+  height: 4px;
+  background: var(--surface-hi);
+  border-radius: 999px;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+#scan-progress.active { opacity: 1; }
+#scan-progress-bar {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, var(--accent), #ff8a96);
+  transition: width 240ms ease;
+}
+
+#scan-log {
+  list-style: none;
+  padding: 0;
+  margin: 0.75rem 0 0;
+  max-height: 180px;
+  overflow: auto;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+}
+#scan-log li {
+  padding: 0.25rem 0;
+  color: var(--muted);
+  border-bottom: 1px dashed var(--border);
+}
+#scan-log li.kind-phase_start { color: var(--text); }
+#scan-log li.kind-phase_end { color: #9ad0a5; }
+#scan-log li.kind-error { color: var(--accent); }
+#scan-log li.kind-result { color: #ffd57a; }
+
+.panel-graph { grid-column: 1 / -1; }
+#cy {
+  height: 460px;
+  margin-top: 0.75rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+#graph-status { margin-top: 0.5rem; font-family: var(--mono); font-size: 0.8rem; color: var(--muted); }
+#node-detail {
+  margin-top: 0.75rem;
+  min-height: 40px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.6rem 0.9rem;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--muted);
+}

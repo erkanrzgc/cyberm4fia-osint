@@ -15,6 +15,7 @@ from core.cross_reference import cross_reference
 from core.http_client import HTTPClient
 from core.logging_setup import get_logger
 from core.models import EmailResult, PhotoMatch, PlatformResult, ScanResult
+from core.progress import emit as _emit
 from core.reporter import console
 from core.smart_search import (
     extract_discoverable_data,
@@ -161,6 +162,7 @@ async def _phase_platform_check(
     client: HTTPClient, cfg: ScanConfig, platforms: list[Platform], result: ScanResult
 ) -> list[PlatformResult]:
     console.print("  [bold yellow][1/8][/bold yellow] Starting platform sweep...")
+    _emit("phase_start", phase="platform_sweep", total=len(platforms))
     tasks = [_check_platform(client, cfg.username, p) for p in platforms]
     platform_results = await asyncio.gather(*tasks)
 
@@ -184,6 +186,13 @@ async def _phase_platform_check(
         f"[green]{found_count}[/green]/{len(platform_results)} platforms matched{suffix}"
     )
     result.platforms = list(platform_results)
+    _emit(
+        "phase_end",
+        phase="platform_sweep",
+        found=found_count,
+        total=len(platform_results),
+        dropped=dropped,
+    )
     return platform_results
 
 
@@ -725,23 +734,74 @@ async def run_scan(cfg: ScanConfig) -> ScanResult:
             )
 
         platform_results = await _phase_platform_check(client, cfg, platforms, result)
-        await _phase_deep_scrape(client, cfg, platform_results)
-        await _phase_smart_search(client, cfg, platforms, platform_results, result)
-        await _phase_photo(client, cfg, result)
-        await _phase_email_breach(client, cfg, platform_results, result)
-        await _phase_web_presence(client, cfg, platform_results, result)
-        await _phase_whois(cfg, result)
-        await _phase_dns_subdomain(client, cfg, result)
-        await _phase_recursive(client, cfg, platforms, result)
-        await _phase_reverse_image(client, cfg, result)
-        await _phase_username_history(client, cfg, result)
-        await _phase_passive(client, cfg, result)
-        await _phase_phone(client, cfg, result)
-        await _phase_crypto(client, cfg, result)
 
+        _emit("phase_start", phase="deep_scrape")
+        await _phase_deep_scrape(client, cfg, platform_results)
+        _emit("phase_end", phase="deep_scrape")
+
+        _emit("phase_start", phase="smart_search")
+        await _phase_smart_search(client, cfg, platforms, platform_results, result)
+        _emit("phase_end", phase="smart_search")
+
+        _emit("phase_start", phase="photo")
+        await _phase_photo(client, cfg, result)
+        _emit("phase_end", phase="photo")
+
+        _emit("phase_start", phase="email_breach")
+        await _phase_email_breach(client, cfg, platform_results, result)
+        _emit("phase_end", phase="email_breach", emails=len(result.emails))
+
+        _emit("phase_start", phase="web_presence")
+        await _phase_web_presence(client, cfg, platform_results, result)
+        _emit("phase_end", phase="web_presence")
+
+        _emit("phase_start", phase="whois")
+        await _phase_whois(cfg, result)
+        _emit("phase_end", phase="whois")
+
+        _emit("phase_start", phase="dns_subdomain")
+        await _phase_dns_subdomain(client, cfg, result)
+        _emit("phase_end", phase="dns_subdomain")
+
+        _emit("phase_start", phase="recursive")
+        await _phase_recursive(client, cfg, platforms, result)
+        _emit("phase_end", phase="recursive")
+
+        _emit("phase_start", phase="reverse_image")
+        await _phase_reverse_image(client, cfg, result)
+        _emit("phase_end", phase="reverse_image")
+
+        _emit("phase_start", phase="username_history")
+        await _phase_username_history(client, cfg, result)
+        _emit("phase_end", phase="username_history")
+
+        _emit("phase_start", phase="passive")
+        await _phase_passive(client, cfg, result)
+        _emit("phase_end", phase="passive")
+
+        _emit("phase_start", phase="phone")
+        await _phase_phone(client, cfg, result)
+        _emit("phase_end", phase="phone")
+
+        _emit("phase_start", phase="crypto")
+        await _phase_crypto(client, cfg, result)
+        _emit("phase_end", phase="crypto")
+
+    _emit("phase_start", phase="cross_reference")
     _finalize_cross_reference(result)
+    _emit("phase_end", phase="cross_reference")
+
+    _emit("phase_start", phase="enrichment")
     _phase_enrichment(cfg, result)
+    _emit("phase_end", phase="enrichment")
+
     result.scan_time = time.monotonic() - start_time
+    _emit(
+        "done",
+        phase="done",
+        scan_time=result.scan_time,
+        found_platforms=sum(1 for p in result.platforms if p.exists),
+    )
     return result
 
 

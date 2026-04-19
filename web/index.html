@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>cyberm4fia-osint</title>
   <link rel="stylesheet" href="/static/style.css" />
+  <script src="https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
 </head>
 <body>
   <header class="hero">
@@ -34,10 +35,28 @@
           <label><input type="checkbox" name="past_usernames" /> past-usernames</label>
           <label><input type="checkbox" name="tor" /> tor</label>
         </div>
+        <div class="row">
+          <label class="inline"><input type="checkbox" name="stream" checked /> live progress</label>
+        </div>
         <button type="submit">Scan</button>
       </form>
       <div id="scan-status"></div>
+      <div id="scan-progress">
+        <div id="scan-progress-bar"></div>
+      </div>
+      <ul id="scan-log"></ul>
       <pre id="scan-output"></pre>
+    </section>
+
+    <section class="panel panel-graph">
+      <h2>Entity graph</h2>
+      <form id="graph-form" class="row">
+        <input name="username" placeholder="username" required />
+        <button type="submit">Load</button>
+      </form>
+      <div id="graph-status"></div>
+      <div id="cy"></div>
+      <pre id="node-detail"></pre>
     </section>
 
     <section class="panel">
