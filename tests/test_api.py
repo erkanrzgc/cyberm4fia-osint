@@ -19,7 +19,14 @@ from core.models import PlatformResult, ScanResult  # noqa: E402
 @pytest.fixture
 def client(tmp_path: Path, monkeypatch):
     # Redirect watchlist DB to a temp file so tests don't trample state.
-    monkeypatch.setattr(watchlist, "DEFAULT_DB_PATH", tmp_path / "wl.sqlite3")
+    wl_db = tmp_path / "wl.sqlite3"
+    monkeypatch.setattr(watchlist, "DEFAULT_DB_PATH", wl_db)
+    # Module-level functions bound `db_path=DEFAULT_DB_PATH` at def time, so
+    # callers without an explicit db_path still reference the original path.
+    # Rebind the defaults so the API layer picks up the tmp DB too.
+    for fn in (watchlist.add, watchlist.remove, watchlist.list_all,
+              watchlist.mark_scanned, watchlist.get):
+        monkeypatch.setitem(fn.__kwdefaults__, "db_path", wl_db)
 
     async def fake_run_scan(cfg):
         r = ScanResult(username=cfg.username)

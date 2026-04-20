@@ -111,13 +111,13 @@ def get_latest(
         if before_id is None:
             row = conn.execute(
                 "SELECT id, username, ts, found_count, payload FROM scans "
-                "WHERE username = ? ORDER BY ts DESC LIMIT 1",
+                "WHERE username = ? ORDER BY ts DESC, id DESC LIMIT 1",
                 (username,),
             ).fetchone()
         else:
             row = conn.execute(
                 "SELECT id, username, ts, found_count, payload FROM scans "
-                "WHERE username = ? AND id < ? ORDER BY ts DESC LIMIT 1",
+                "WHERE username = ? AND id < ? ORDER BY ts DESC, id DESC LIMIT 1",
                 (username, before_id),
             ).fetchone()
     finally:

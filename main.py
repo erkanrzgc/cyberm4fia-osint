@@ -243,6 +243,14 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Skip offline enrichment (stylometry/language/timezone/entity graph)",
     )
+    p.add_argument(
+        "--schedule", dest="schedule", action="store_true",
+        help="Run the scheduler: repeatedly scan every watchlist entry and fire notifications on diffs",
+    )
+    p.add_argument(
+        "--schedule-interval", dest="schedule_interval", type=float, default=60.0,
+        help="Minutes between scheduled passes (default 60)",
+    )
     return p
 
 
@@ -429,6 +437,29 @@ def main() -> None:
             f"  [cyan]Starting API on http://{args.host}:{args.port}[/cyan]"
         )
         serve(host=args.host, port=args.port)
+        return
+
+    if args.schedule:
+        from core.scheduler import run_forever
+        from core.notify import build_default_notifiers
+
+        cfg_template = ScanConfig.from_args(args, username="")
+        sinks = build_default_notifiers()
+        sink_names = ", ".join(n.name for n in sinks) if sinks else "none"
+        console.print(
+            f"  [cyan]Scheduler running[/cyan] — interval={args.schedule_interval:.1f} min, "
+            f"notifiers=[{sink_names}]"
+        )
+        try:
+            asyncio.run(
+                run_forever(
+                    cfg_template,
+                    interval_minutes=args.schedule_interval,
+                    notifiers=sinks,
+                )
+            )
+        except KeyboardInterrupt:
+            console.print("  [yellow]Scheduler stopped.[/yellow]")
         return
 
     if _handle_watchlist_commands(args):
