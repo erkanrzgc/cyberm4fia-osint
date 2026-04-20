@@ -137,6 +137,41 @@ def test_graph_404_when_no_history(client: TestClient, monkeypatch) -> None:
     assert r.status_code == 404
 
 
+def test_heatmap_404_when_no_history(client: TestClient, monkeypatch) -> None:
+    monkeypatch.setattr(api_server, "get_latest", lambda u, before_id=None: None)
+    r = client.get("/heatmap/ghost")
+    assert r.status_code == 404
+
+
+def test_heatmap_folds_duplicate_coords(client: TestClient, monkeypatch) -> None:
+    from core.history import HistoryEntry
+
+    payload = {
+        "username": "mallory",
+        "platforms": [],
+        "geo_points": [
+            {"lat": 41.0, "lng": 29.0, "display": "Istanbul", "source": "GitHub"},
+            {"lat": 41.00004, "lng": 29.00003, "display": "Istanbul", "source": "Twitter"},
+            {"lat": 52.52, "lng": 13.4, "display": "Berlin", "source": "Bluesky"},
+            {"lat": "bad", "lng": 0.0, "display": "skip me"},  # must be discarded
+        ],
+    }
+    entry = HistoryEntry(id=7, username="mallory", ts=1, found_count=0, payload=payload)
+    monkeypatch.setattr(api_server, "get_latest", lambda u, before_id=None: entry)
+
+    r = client.get("/heatmap/mallory")
+    assert r.status_code == 200
+    data = r.json()
+    # Two unique rounded coords → two heatmap points.
+    assert len(data["points"]) == 2
+    istanbul = next(p for p in data["points"] if round(p[0], 1) == 41.0)
+    # Weight reflects the two Istanbul hits that fold together.
+    assert istanbul[2] == 2
+    # Markers expose source + label.
+    sources = {m["source"] for m in data["markers"]}
+    assert {"GitHub", "Twitter", "Bluesky"}.issubset(sources)
+
+
 def test_graph_returns_cytoscape_payload(client: TestClient, monkeypatch) -> None:
     from core.history import HistoryEntry
 

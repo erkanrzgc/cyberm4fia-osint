@@ -5,7 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>cyberm4fia-osint</title>
   <link rel="stylesheet" href="/static/style.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 </head>
 <body>
   <header class="hero">
@@ -57,6 +60,16 @@
       <div id="graph-status"></div>
       <div id="cy"></div>
       <pre id="node-detail"></pre>
+    </section>
+
+    <section class="panel panel-map">
+      <h2>Location heatmap</h2>
+      <form id="heatmap-form" class="row">
+        <input name="username" placeholder="username" required />
+        <button type="submit">Load map</button>
+      </form>
+      <div id="heatmap-status"></div>
+      <div id="map"></div>
     </section>
 
     <section class="panel">

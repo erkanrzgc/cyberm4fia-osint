@@ -169,6 +169,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Directory to drop screenshots into (default: reports/screenshots/<user>)",
     )
     p.add_argument(
+        "--geocode",
+        action="store_true",
+        help="Resolve discovered locations via Nominatim for the heatmap "
+        "(cached locally; 1 req/s upstream rate limit)",
+    )
+    p.add_argument(
         "--passive",
         action="store_true",
         help="Run passive intel sources (Shodan/Censys/FOFA/ZoomEye/Pastebin/Ahmia/Wayback)",

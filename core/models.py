@@ -90,6 +90,7 @@ class ScanResult:
     historical_usernames: list = field(default_factory=list)  # HistoricalUsername
     phone_intel: list = field(default_factory=list)  # PhoneIntel entries
     crypto_intel: list = field(default_factory=list)  # CryptoIntel entries
+    geo_points: list = field(default_factory=list)  # GeoPoint entries
     enrichment: dict | None = None  # EnrichmentReport.to_dict() or None
     scan_time: float = 0.0
     ai_report: dict | None = None
@@ -231,6 +232,10 @@ class ScanResult:
             "crypto_intel": [
                 c.to_dict() if hasattr(c, "to_dict") else c
                 for c in self.crypto_intel
+            ],
+            "geo_points": [
+                g.to_dict() if hasattr(g, "to_dict") else g
+                for g in self.geo_points
             ],
             "enrichment": self.enrichment,
             "ai_report": self.ai_report,

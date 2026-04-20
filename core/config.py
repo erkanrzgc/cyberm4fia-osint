@@ -96,6 +96,7 @@ class ScanConfig:
     playwright: bool = False
     screenshots: bool = False
     screenshot_dir: str | None = None
+    geocode: bool = False
 
     @classmethod
     def from_args(cls, args, username: str) -> ScanConfig:
@@ -174,6 +175,7 @@ class ScanConfig:
             playwright=getattr(args, "playwright", False),
             screenshots=getattr(args, "screenshots", False),
             screenshot_dir=getattr(args, "screenshot_dir", None),
+            geocode=getattr(args, "geocode", False),
             phone=phone,
             phone_region=phone_region,
             crypto_addresses=crypto_addresses,

@@ -746,6 +746,24 @@ async def _phase_crypto(
     result.crypto_intel = list(intel)
 
 
+async def _phase_geocode(cfg: ScanConfig, result: ScanResult) -> None:
+    """Resolve location strings found in profile data to lat/lng.
+
+    Network-bound and politely rate-limited; only runs when the user opts
+    in with ``--geocode`` because Nominatim enforces a 1 req/s policy.
+    """
+    if not cfg.geocode:
+        return
+    from core import geo
+
+    payload = result.to_dict()
+    hints = geo.extract_location_hints(payload)
+    if not hints:
+        return
+    points = await geo.geocode_many(hints)
+    result.geo_points = list(points)
+
+
 def _phase_enrichment(cfg: ScanConfig, result: ScanResult) -> None:
     """Run synchronous enrichment (stylometry/language/timezone/graph)."""
     if not cfg.enrichment:
@@ -835,6 +853,11 @@ async def run_scan(cfg: ScanConfig) -> ScanResult:
     _emit("phase_start", phase="cross_reference")
     _finalize_cross_reference(result)
     _emit("phase_end", phase="cross_reference")
+
+    if cfg.geocode:
+        _emit("phase_start", phase="geocode")
+        await _phase_geocode(cfg, result)
+        _emit("phase_end", phase="geocode", resolved=len(result.geo_points))
 
     _emit("phase_start", phase="enrichment")
     _phase_enrichment(cfg, result)

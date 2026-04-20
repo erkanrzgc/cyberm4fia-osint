@@ -175,6 +175,14 @@ footer a { color: var(--accent); text-decoration: none; }
 #scan-log li.kind-result { color: #ffd57a; }
 
 .panel-graph { grid-column: 1 / -1; }
+.panel-map { grid-column: 1 / -1; }
+#map {
+  height: 420px;
+  margin-top: 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
 #cy {
   height: 460px;
   margin-top: 0.75rem;

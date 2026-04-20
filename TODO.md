@@ -17,8 +17,13 @@
 - [x] Playwright'i JS-heavy platformlarda (Instagram, X, TikTok, Threads, LinkedIn) varsayilan yap
 - [x] Playwright screenshot'lari scan sonucuna ekle (--screenshots)
 
+## Sprint 12: Geolocation Heatmap  ✅
+- [x] core/geo.py — SQLite-cached Nominatim geocoder + GeoPoint dataclass
+- [x] --geocode CLI flag + _phase_geocode engine phase
+- [x] GET /heatmap/{username} API (duplicate coord folding)
+- [x] Leaflet + Leaflet.heat web panel, OSM tiles, markers with popups
+
 ## Backlog (oncelik sirasiyla)
-- [ ] Geolocation heatmap — timezone/ulke/sehir verisini Leaflet.js haritada goster
 - [ ] Username correlation scoring — iki username'in ayni kisiye ait olma olasiligi
 - [ ] Report comparison UI — iki scan'i yan yana diff goruntule
 - [ ] Social graph — follow/follower overlap (GitHub, Twitter API)

@@ -182,6 +182,42 @@ def build_app() -> FastAPI:
             **payload_to_cytoscape(entry.payload),
         }
 
+    @app.get("/heatmap/{username}")
+    def heatmap(username: str) -> dict[str, Any]:
+        entry = get_latest(username)
+        if entry is None:
+            raise HTTPException(status_code=404, detail="no scans for user")
+        points = entry.payload.get("geo_points") or []
+        # Leaflet.heat wants [[lat, lng, weight], ...]. Weight starts at 1
+        # per hit; duplicate coords are folded so popular cities pop.
+        weights: dict[tuple[float, float], int] = {}
+        markers: list[dict[str, Any]] = []
+        for g in points:
+            try:
+                lat = float(g["lat"])
+                lng = float(g["lng"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            key = (round(lat, 4), round(lng, 4))
+            weights[key] = weights.get(key, 0) + 1
+            markers.append(
+                {
+                    "lat": lat,
+                    "lng": lng,
+                    "label": g.get("display") or g.get("query") or "",
+                    "source": g.get("source") or "",
+                    "country": g.get("country") or "",
+                }
+            )
+        heat = [[lat, lng, w] for (lat, lng), w in weights.items()]
+        return {
+            "username": username,
+            "scan_id": entry.id,
+            "ts": entry.ts,
+            "points": heat,
+            "markers": markers,
+        }
+
     @app.get("/history/{username}")
     def history(username: str, limit: int = 20) -> dict[str, Any]:
         entries = list_scans(username, limit=limit)

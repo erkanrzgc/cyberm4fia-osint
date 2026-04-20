@@ -9,8 +9,13 @@ const watchList = document.getElementById("watch-list");
 const graphForm = document.getElementById("graph-form");
 const graphStatus = document.getElementById("graph-status");
 const nodeDetail = document.getElementById("node-detail");
+const heatmapForm = document.getElementById("heatmap-form");
+const heatmapStatus = document.getElementById("heatmap-status");
 
 let cy = null;
+let leafletMap = null;
+let heatLayer = null;
+let markerLayer = null;
 
 const KIND_COLOR = {
   identity: "#ff4c60",
@@ -249,6 +254,59 @@ graphForm.addEventListener("submit", (ev) => {
   const fd = new FormData(graphForm);
   const username = (fd.get("username") || "").toString().trim();
   if (username) loadGraph(username);
+});
+
+function ensureMap() {
+  if (leafletMap) return leafletMap;
+  if (!window.L) return null;
+  leafletMap = window.L.map("map", { worldCopyJump: true }).setView([20, 0], 2);
+  window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "© OpenStreetMap",
+    maxZoom: 18,
+  }).addTo(leafletMap);
+  return leafletMap;
+}
+
+async function loadHeatmap(username) {
+  const map = ensureMap();
+  if (!map) {
+    heatmapStatus.textContent = "leaflet not loaded";
+    return;
+  }
+  heatmapStatus.textContent = "loading heatmap for " + username + "...";
+  if (heatLayer) { map.removeLayer(heatLayer); heatLayer = null; }
+  if (markerLayer) { map.removeLayer(markerLayer); markerLayer = null; }
+
+  try {
+    const r = await fetch("/heatmap/" + encodeURIComponent(username));
+    if (r.status === 404) { heatmapStatus.textContent = "no scans yet for " + username; return; }
+    if (!r.ok) { heatmapStatus.textContent = "error: HTTP " + r.status; return; }
+    const data = await r.json();
+    const points = data.points || [];
+    const markers = data.markers || [];
+    if (!points.length) {
+      heatmapStatus.textContent = "no geocoded locations (run with --geocode)";
+      return;
+    }
+    heatLayer = window.L.heatLayer(points, { radius: 28, blur: 22, maxZoom: 12 }).addTo(map);
+    markerLayer = window.L.layerGroup(
+      markers.map((m) => window.L.marker([m.lat, m.lng]).bindPopup(
+        "<b>" + (m.label || "") + "</b><br/>source: " + (m.source || "?")
+      ))
+    ).addTo(map);
+    const bounds = window.L.latLngBounds(markers.map((m) => [m.lat, m.lng]));
+    if (bounds.isValid()) map.fitBounds(bounds.pad(0.2));
+    heatmapStatus.textContent = points.length + " unique locations · " + markers.length + " hits";
+  } catch (err) {
+    heatmapStatus.textContent = "network error: " + err.message;
+  }
+}
+
+heatmapForm.addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  const fd = new FormData(heatmapForm);
+  const username = (fd.get("username") || "").toString().trim();
+  if (username) loadHeatmap(username);
 });
 
 refreshWatchlist();
