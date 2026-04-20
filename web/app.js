@@ -11,6 +11,10 @@ const graphStatus = document.getElementById("graph-status");
 const nodeDetail = document.getElementById("node-detail");
 const heatmapForm = document.getElementById("heatmap-form");
 const heatmapStatus = document.getElementById("heatmap-status");
+const correlateForm = document.getElementById("correlate-form");
+const correlateStatus = document.getElementById("correlate-status");
+const correlateVerdict = document.getElementById("correlate-verdict");
+const correlateSignals = document.getElementById("correlate-signals");
 
 let cy = null;
 let leafletMap = null;
@@ -307,6 +311,61 @@ heatmapForm.addEventListener("submit", (ev) => {
   const fd = new FormData(heatmapForm);
   const username = (fd.get("username") || "").toString().trim();
   if (username) loadHeatmap(username);
+});
+
+async function loadCorrelation(a, b) {
+  correlateStatus.textContent = "scoring " + a + " vs " + b + "...";
+  correlateVerdict.className = "";
+  correlateSignals.innerHTML = "";
+  try {
+    const url = "/correlate?a=" + encodeURIComponent(a) + "&b=" + encodeURIComponent(b);
+    const r = await fetch(url);
+    if (r.status === 404) { correlateStatus.textContent = "no scan history for one of them — run a scan first"; return; }
+    if (r.status === 400) { correlateStatus.textContent = "a and b must be different usernames"; return; }
+    if (!r.ok) { correlateStatus.textContent = "error: HTTP " + r.status; return; }
+    const data = await r.json();
+
+    correlateStatus.textContent = "compared scan #" + data.scan_a.id + " vs #" + data.scan_b.id;
+    const pct = Math.round(data.score * 100);
+    correlateVerdict.className = "show verdict-" + data.verdict;
+    correlateVerdict.innerHTML =
+      "<span class='score'>" + pct + "%</span>" +
+      " — same-person likelihood" +
+      "<span class='verdict-tag verdict-" + data.verdict + "'>" + data.verdict.replace(/_/g, " ") + "</span>";
+
+    if (!data.signals.length) {
+      const li = document.createElement("li");
+      li.textContent = "no shared signals found";
+      correlateSignals.appendChild(li);
+      return;
+    }
+    for (const s of data.signals) {
+      const li = document.createElement("li");
+      const kind = document.createElement("span");
+      kind.className = "kind";
+      kind.textContent = s.kind;
+      const detail = document.createElement("span");
+      detail.textContent = s.detail;
+      const weight = document.createElement("span");
+      weight.className = "weight";
+      weight.textContent = "+" + Math.round(s.weight * 100) + "%";
+      li.appendChild(kind);
+      li.appendChild(detail);
+      li.appendChild(weight);
+      correlateSignals.appendChild(li);
+    }
+  } catch (err) {
+    correlateStatus.textContent = "network error: " + err.message;
+  }
+}
+
+correlateForm.addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  const fd = new FormData(correlateForm);
+  const a = (fd.get("a") || "").toString().trim();
+  const b = (fd.get("b") || "").toString().trim();
+  if (!a || !b) return;
+  loadCorrelation(a, b);
 });
 
 refreshWatchlist();

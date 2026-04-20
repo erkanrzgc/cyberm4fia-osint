@@ -232,6 +232,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Bind port for --serve (default 8000)",
     )
     p.add_argument(
+        "--correlate",
+        dest="correlate",
+        type=str,
+        default=None,
+        metavar="USER_A,USER_B",
+        help="Score how likely two usernames are the same person "
+             "(uses the latest scan history for each). Exits after printing.",
+    )
+    p.add_argument(
         "--watchlist-add", dest="watchlist_add", type=str, default=None,
         help="Add a username to the watchlist and exit",
     )
@@ -436,6 +445,55 @@ async def _run_bulk_mode(usernames: list[str], args, from_watchlist: bool) -> No
     )
 
 
+def _run_correlate(spec: str) -> None:
+    """Handle --correlate USER_A,USER_B: compare latest histories and print."""
+    parts = [p.strip() for p in spec.split(",") if p.strip()]
+    if len(parts) != 2:
+        console.print(
+            "  [red]--correlate expects exactly two usernames, "
+            "comma-separated (e.g. --correlate alice,bob)[/red]"
+        )
+        sys.exit(2)
+    a_user, b_user = parts
+    if a_user.lower() == b_user.lower():
+        console.print("  [red]--correlate: a and b must differ[/red]")
+        sys.exit(2)
+
+    from core.correlation import correlate
+    from core.history import get_latest
+
+    a_entry = get_latest(a_user)
+    if a_entry is None:
+        console.print(f"  [red]No scan history for {a_user} — run a scan first.[/red]")
+        sys.exit(1)
+    b_entry = get_latest(b_user)
+    if b_entry is None:
+        console.print(f"  [red]No scan history for {b_user} — run a scan first.[/red]")
+        sys.exit(1)
+
+    result = correlate(a_entry.payload, b_entry.payload)
+    pct = int(round(result.score * 100))
+    verdict_color = {
+        "very_likely_same": "bright_green",
+        "likely_same": "green",
+        "possible": "yellow",
+        "weak_signal": "yellow",
+        "no_evidence": "red",
+    }.get(result.verdict, "white")
+    console.print(
+        f"\n  [bold]{a_user}[/bold] vs [bold]{b_user}[/bold] — "
+        f"[{verdict_color}]{pct}%[/{verdict_color}] "
+        f"([{verdict_color}]{result.verdict}[/{verdict_color}])"
+    )
+    if not result.signals:
+        console.print("  [dim]no shared signals[/dim]")
+        return
+    for sig in result.signals:
+        console.print(
+            f"    [cyan]{sig.kind:<9}[/cyan] +{int(round(sig.weight * 100)):>3}%  {sig.detail}"
+        )
+
+
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
@@ -478,6 +536,10 @@ def main() -> None:
             )
         except KeyboardInterrupt:
             console.print("  [yellow]Scheduler stopped.[/yellow]")
+        return
+
+    if args.correlate:
+        _run_correlate(args.correlate)
         return
 
     if _handle_watchlist_commands(args):

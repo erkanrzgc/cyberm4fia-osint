@@ -23,8 +23,14 @@
 - [x] GET /heatmap/{username} API (duplicate coord folding)
 - [x] Leaflet + Leaflet.heat web panel, OSM tiles, markers with popups
 
+## Sprint 13: Username Correlation Scoring  ✅
+- [x] core/correlation.py — evidence-first scorer, probabilistic OR
+  (email/phone/crypto/name/location/bio/alias/avatar signals)
+- [x] GET /correlate?a=&b= API endpoint
+- [x] --correlate user_a,user_b CLI flag
+- [x] Web UI panel with verdict badge + signals table
+
 ## Backlog (oncelik sirasiyla)
-- [ ] Username correlation scoring — iki username'in ayni kisiye ait olma olasiligi
 - [ ] Report comparison UI — iki scan'i yan yana diff goruntule
 - [ ] Social graph — follow/follower overlap (GitHub, Twitter API)
 - [ ] OSINT investigation/case yonetimi — bookmark, etiket, not sistemi

@@ -172,6 +172,59 @@ def test_heatmap_folds_duplicate_coords(client: TestClient, monkeypatch) -> None
     assert {"GitHub", "Twitter", "Bluesky"}.issubset(sources)
 
 
+def test_correlate_requires_both_usernames(client: TestClient) -> None:
+    r = client.get("/correlate", params={"a": "alice", "b": ""})
+    assert r.status_code == 422
+    r = client.get("/correlate", params={"a": "alice", "b": "Alice"})
+    assert r.status_code == 400
+
+
+def test_correlate_404_when_either_has_no_history(client: TestClient, monkeypatch) -> None:
+    from core.history import HistoryEntry
+
+    alice = HistoryEntry(id=1, username="alice", ts=1, found_count=0, payload={"username": "alice"})
+
+    def fake_latest(u, before_id=None):
+        return alice if u == "alice" else None
+
+    monkeypatch.setattr(api_server, "get_latest", fake_latest)
+    r = client.get("/correlate", params={"a": "alice", "b": "ghost"})
+    assert r.status_code == 404
+
+
+def test_correlate_returns_score_and_signals(client: TestClient, monkeypatch) -> None:
+    from core.history import HistoryEntry
+
+    a_payload = {
+        "username": "alice",
+        "emails": [{"email": "shared@x.io"}],
+        "phone_intel": [{"e164": "+905551234567"}],
+    }
+    b_payload = {
+        "username": "alice2",
+        "emails": [{"email": "shared@x.io"}],
+        "phone_intel": [{"e164": "+905551234567"}],
+    }
+    a_entry = HistoryEntry(id=1, username="alice", ts=10, found_count=1, payload=a_payload)
+    b_entry = HistoryEntry(id=2, username="alice2", ts=20, found_count=1, payload=b_payload)
+
+    monkeypatch.setattr(
+        api_server,
+        "get_latest",
+        lambda u, before_id=None: a_entry if u == "alice" else b_entry,
+    )
+    r = client.get("/correlate", params={"a": "alice", "b": "alice2"})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["username_a"] == "alice"
+    assert data["username_b"] == "alice2"
+    assert data["verdict"] == "very_likely_same"
+    kinds = {s["kind"] for s in data["signals"]}
+    assert {"email", "phone"} <= kinds
+    assert data["scan_a"]["id"] == 1
+    assert data["scan_b"]["id"] == 2
+
+
 def test_graph_returns_cytoscape_payload(client: TestClient, monkeypatch) -> None:
     from core.history import HistoryEntry
 

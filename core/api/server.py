@@ -23,6 +23,7 @@ from pydantic import BaseModel, Field
 from core import watchlist
 from core.api.cytoscape import payload_to_cytoscape
 from core.config import ScanConfig
+from core.correlation import correlate
 from core.engine import run_scan
 from core.history import diff_entries, get_latest, list_scans, save_scan
 from core.logging_setup import get_logger
@@ -216,6 +217,32 @@ def build_app() -> FastAPI:
             "ts": entry.ts,
             "points": heat,
             "markers": markers,
+        }
+
+    @app.get("/correlate")
+    def correlate_users(a: str, b: str) -> dict[str, Any]:
+        """Score how likely two usernames are the same person.
+
+        Pulls the latest scan payload from history for each side and
+        runs the correlation scorer. 404s if either user has no history —
+        the scorer needs something to compare against.
+        """
+        a_clean, b_clean = a.strip(), b.strip()
+        if not a_clean or not b_clean:
+            raise HTTPException(status_code=422, detail="both a and b are required")
+        if a_clean.lower() == b_clean.lower():
+            raise HTTPException(status_code=400, detail="a and b must differ")
+        entry_a = get_latest(a_clean)
+        if entry_a is None:
+            raise HTTPException(status_code=404, detail=f"no scans for {a_clean}")
+        entry_b = get_latest(b_clean)
+        if entry_b is None:
+            raise HTTPException(status_code=404, detail=f"no scans for {b_clean}")
+        result = correlate(entry_a.payload, entry_b.payload)
+        return {
+            "scan_a": {"id": entry_a.id, "ts": entry_a.ts},
+            "scan_b": {"id": entry_b.id, "ts": entry_b.ts},
+            **result.to_dict(),
         }
 
     @app.get("/history/{username}")
