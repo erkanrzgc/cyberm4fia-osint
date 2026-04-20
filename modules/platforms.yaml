@@ -4,14 +4,17 @@ platforms:
   category: social
   check_type: content_absent
   error_text: Sorry, this page isn't available
+  js_heavy: true
 - name: Twitter / X
   url: https://x.com/{username}
   category: social
+  js_heavy: true
 - name: TikTok
   url: https://www.tiktok.com/@{username}
   category: social
   check_type: content_absent
   error_text: Couldn't find this account
+  js_heavy: true
 - name: Facebook
   url: https://www.facebook.com/{username}
   category: social
@@ -41,6 +44,7 @@ platforms:
 - name: Threads
   url: https://www.threads.net/@{username}
   category: social
+  js_heavy: true
 - name: Mastodon (mastodon.social)
   url: https://mastodon.social/@{username}
   category: social
@@ -191,6 +195,7 @@ platforms:
 - name: LinkedIn
   url: https://www.linkedin.com/in/{username}
   category: professional
+  js_heavy: true
 - name: About.me
   url: https://about.me/{username}
   category: professional

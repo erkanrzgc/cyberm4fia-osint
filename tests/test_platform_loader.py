@@ -161,3 +161,40 @@ def test_platform_dataclass_defaults():
     p = Platform(name="A", url="https://a/{username}", category="dev")
     assert p.check_type == "status"
     assert p.headers is None
+    assert p.js_heavy is False
+    assert p.wait_for_selector is None
+
+
+def test_coerce_js_heavy_flag():
+    p = _coerce(
+        {
+            "name": "X",
+            "url": "https://x/{username}",
+            "category": "social",
+            "js_heavy": True,
+            "wait_for_selector": "main[role=main]",
+        }
+    )
+    assert p.js_heavy is True
+    assert p.wait_for_selector == "main[role=main]"
+
+
+def test_coerce_rejects_non_string_selector():
+    with pytest.raises(ValueError):
+        _coerce(
+            {
+                "name": "X",
+                "url": "https://x/{username}",
+                "category": "s",
+                "wait_for_selector": 42,
+            }
+        )
+
+
+def test_builtin_tags_known_js_heavy_sites():
+    by_name = {p.name: p for p in load_platforms()}
+    assert by_name["Instagram"].js_heavy is True
+    assert by_name["TikTok"].js_heavy is True
+    assert by_name["LinkedIn"].js_heavy is True
+    # A plain-HTML site should remain aiohttp-only.
+    assert by_name["GitHub"].js_heavy is False

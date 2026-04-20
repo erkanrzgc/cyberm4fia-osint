@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from pathlib import Path
 
 from core.config import ScanConfig
 from core.cross_reference import cross_reference
@@ -38,6 +39,10 @@ from modules.fp_filter import score_match
 from modules.photo_compare import compare_profile_photos
 from modules.platforms import PLATFORMS, Platform
 from modules.profile_extract import extract_profile, is_available as _extract_available
+from modules.stealth.playwright_fallback import (
+    AVAILABLE as PLAYWRIGHT_AVAILABLE,
+    fetch_rendered,
+)
 from modules.web_presence import discover_web_presence
 from modules.whois_lookup import check_username_domains
 
@@ -61,9 +66,26 @@ IMPORTANT_PLATFORMS_FOR_VARIATIONS = frozenset(
 # ── Phase helpers ─────────────────────────────────────────────────────────
 
 
+def _should_render(platform: Platform, cfg: ScanConfig) -> bool:
+    if not PLAYWRIGHT_AVAILABLE:
+        return False
+    if platform.check_type == "json_api":
+        return False
+    # Forced global opt-in (--playwright) OR platform flagged as js_heavy.
+    return bool(cfg.playwright or platform.js_heavy)
+
+
+def _screenshot_dir_for(cfg: ScanConfig) -> Path | None:
+    if not cfg.screenshots:
+        return None
+    base = cfg.screenshot_dir or "reports/screenshots"
+    return Path(base) / cfg.username
+
+
 async def _check_platform(
-    client: HTTPClient, username: str, platform: Platform
+    client: HTTPClient, cfg: ScanConfig, platform: Platform
 ) -> PlatformResult:
+    username = cfg.username
     url = platform.url.replace("{username}", username)
     result = PlatformResult(platform=platform.name, url=url, category=platform.category)
 
@@ -74,7 +96,30 @@ async def _check_platform(
             result.response_time = elapsed
             result.exists = status == 200 and data is not None
         else:
-            status, body, elapsed = await client.get(url, platform.headers)
+            status = -1
+            body: str = ""
+            elapsed = 0.0
+
+            if _should_render(platform, cfg):
+                t0 = time.monotonic()
+                rendered = await fetch_rendered(
+                    url,
+                    wait_for_selector=platform.wait_for_selector,
+                    timeout_ms=max(5000, cfg.request_timeout * 1000),
+                    proxy=cfg.proxy,
+                    screenshot_dir=_screenshot_dir_for(cfg),
+                    screenshot_name=platform.name,
+                )
+                elapsed = time.monotonic() - t0
+                if rendered is not None:
+                    status = rendered.status
+                    body = rendered.html
+                    result.rendered = True
+                    result.screenshot_path = rendered.screenshot_path
+
+            if not result.rendered:
+                status, body, elapsed = await client.get(url, platform.headers)
+
             result.http_status = status
             result.response_time = elapsed
             if platform.check_type == "status":
@@ -163,7 +208,7 @@ async def _phase_platform_check(
 ) -> list[PlatformResult]:
     console.print("  [bold yellow][1/8][/bold yellow] Starting platform sweep...")
     _emit("phase_start", phase="platform_sweep", total=len(platforms))
-    tasks = [_check_platform(client, cfg.username, p) for p in platforms]
+    tasks = [_check_platform(client, cfg, p) for p in platforms]
     platform_results = await asyncio.gather(*tasks)
 
     # Deep-scraped platforms are hand-curated and verified via API calls,

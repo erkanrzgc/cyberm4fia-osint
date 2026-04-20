@@ -14,7 +14,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from dataclasses import dataclass
+from pathlib import Path
 
 log = logging.getLogger(__name__)
 
@@ -35,6 +37,14 @@ class RenderedPage:
     status: int
     html: str
     final_url: str
+    screenshot_path: str | None = None
+
+
+_SAFE_SLUG = re.compile(r"[^a-zA-Z0-9._-]+")
+
+
+def _slugify(value: str) -> str:
+    return _SAFE_SLUG.sub("_", value).strip("_") or "page"
 
 
 async def fetch_rendered(
@@ -44,11 +54,15 @@ async def fetch_rendered(
     wait_for_selector: str | None = None,
     timeout_ms: int = 15000,
     proxy: str | None = None,
+    screenshot_dir: Path | None = None,
+    screenshot_name: str | None = None,
 ) -> RenderedPage | None:
     """Fetch ``url`` via a headless Chromium.
 
     Returns None if Playwright is missing or the render failed. Callers
-    should treat None as "fallback unavailable, move on".
+    should treat None as "fallback unavailable, move on". When
+    ``screenshot_dir`` is provided a PNG is saved inside it and the path
+    is returned on ``RenderedPage.screenshot_path``.
     """
     if not AVAILABLE:
         log.debug("playwright not installed; skipping rendered fetch for %s", url)
@@ -76,7 +90,23 @@ async def fetch_rendered(
                 html = await page.content()
                 status = response.status if response else 0
                 final_url = page.url
-                return RenderedPage(url=url, status=status, html=html, final_url=final_url)
+                shot_path: str | None = None
+                if screenshot_dir is not None:
+                    try:
+                        screenshot_dir.mkdir(parents=True, exist_ok=True)
+                        filename = f"{_slugify(screenshot_name or final_url)}.png"
+                        dest = screenshot_dir / filename
+                        await page.screenshot(path=str(dest), full_page=False)
+                        shot_path = str(dest)
+                    except Exception as exc:  # noqa: BLE001
+                        log.debug("screenshot save failed for %s: %s", url, exc)
+                return RenderedPage(
+                    url=url,
+                    status=status,
+                    html=html,
+                    final_url=final_url,
+                    screenshot_path=shot_path,
+                )
             finally:
                 await browser.close()
     except asyncio.CancelledError:

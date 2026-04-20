@@ -33,6 +33,8 @@ class Platform:
     success_text: str = ""
     headers: dict | None = None
     has_deep_scraper: bool = False
+    js_heavy: bool = False
+    wait_for_selector: str | None = None
 
 
 BUILTIN_YAML = Path(__file__).resolve().parent.parent / "modules" / "platforms.yaml"
@@ -55,6 +57,9 @@ def _coerce(entry: dict[str, Any]) -> Platform:
     headers = entry.get("headers")
     if headers is not None and not isinstance(headers, dict):
         raise ValueError(f"platform {name!r} headers must be a mapping")
+    wait_for_selector = entry.get("wait_for_selector")
+    if wait_for_selector is not None and not isinstance(wait_for_selector, str):
+        raise ValueError(f"platform {name!r} wait_for_selector must be a string")
     return Platform(
         name=name,
         url=url,
@@ -64,6 +69,8 @@ def _coerce(entry: dict[str, Any]) -> Platform:
         success_text=entry.get("success_text", "") or "",
         headers=headers,
         has_deep_scraper=bool(entry.get("has_deep_scraper", False)),
+        js_heavy=bool(entry.get("js_heavy", False)),
+        wait_for_selector=wait_for_selector,
     )
 
 

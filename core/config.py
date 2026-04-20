@@ -94,6 +94,8 @@ class ScanConfig:
     new_circuit_every: int = 0
     tor_control_password: str | None = None
     playwright: bool = False
+    screenshots: bool = False
+    screenshot_dir: str | None = None
 
     @classmethod
     def from_args(cls, args, username: str) -> ScanConfig:
@@ -170,6 +172,8 @@ class ScanConfig:
             new_circuit_every=int(getattr(args, "new_circuit_every", 0) or 0),
             tor_control_password=getattr(args, "tor_control_password", None),
             playwright=getattr(args, "playwright", False),
+            screenshots=getattr(args, "screenshots", False),
+            screenshot_dir=getattr(args, "screenshot_dir", None),
             phone=phone,
             phone_region=phone_region,
             crypto_addresses=crypto_addresses,

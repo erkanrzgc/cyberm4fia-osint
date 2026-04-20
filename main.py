@@ -154,7 +154,19 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--playwright",
         action="store_true",
-        help="Enable headless Chromium fallback for JS-rendered profiles",
+        help="Force Playwright for every platform (default: only js_heavy ones)",
+    )
+    p.add_argument(
+        "--screenshots",
+        action="store_true",
+        help="Save Playwright screenshots alongside the scan payload",
+    )
+    p.add_argument(
+        "--screenshot-dir",
+        dest="screenshot_dir",
+        type=str,
+        default=None,
+        help="Directory to drop screenshots into (default: reports/screenshots/<user>)",
     )
     p.add_argument(
         "--passive",

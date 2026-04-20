@@ -13,6 +13,8 @@ class PlatformResult:
     http_status: int = 0
     confidence: float = 0.0  # 0.0-1.0, FP filter signal
     fp_signals: list = field(default_factory=list)
+    rendered: bool = False  # True when Playwright served the body
+    screenshot_path: str | None = None
 
 
 @dataclass
@@ -119,6 +121,8 @@ class ScanResult:
                     "status": p.status,
                     "response_time": round(p.response_time, 3),
                     "profile_data": p.profile_data,
+                    "rendered": p.rendered,
+                    "screenshot_path": p.screenshot_path,
                 }
                 for p in self.platforms
             ],
