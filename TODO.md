@@ -38,8 +38,15 @@
 - [x] --compare user_a,user_b CLI flag
 - [x] Web UI side-by-side diff panel with added/removed coloring
 
+## Sprint 15: Social Graph Overlap  ✅
+- [x] core/social_graph.py — Jaccard similarity + shared follower/following
+  sets, probabilistic combined score
+- [x] GitHub fetcher via public REST API (paginated, 404-safe, max_pages cap)
+- [x] GET /social-graph?a=&b=&platform=github API endpoint
+- [x] --social-graph user_a,user_b CLI flag
+- [x] Web UI panel listing shared connections with clickable GitHub links
+
 ## Backlog (oncelik sirasiyla)
-- [ ] Social graph — follow/follower overlap (GitHub, Twitter API)
 - [ ] OSINT investigation/case yonetimi — bookmark, etiket, not sistemi
 - [ ] Multi-user auth (JWT) — REST API icin
 - [ ] Export: CSV, Excel formatlari

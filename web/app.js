@@ -504,4 +504,81 @@ correlateForm.addEventListener("submit", (ev) => {
   loadCorrelation(a, b);
 });
 
+const socialForm = document.getElementById("social-form");
+const socialStatus = document.getElementById("social-status");
+const socialSummary = document.getElementById("social-summary");
+const socialLists = document.getElementById("social-lists");
+
+function renderSocialList(title, logins) {
+  const wrap = document.createElement("div");
+  wrap.className = "social-list";
+  const h = document.createElement("h3");
+  h.textContent = title;
+  wrap.appendChild(h);
+  const ul = document.createElement("ul");
+  if (!logins || logins.length === 0) {
+    const li = document.createElement("li");
+    li.className = "empty";
+    li.textContent = "none";
+    ul.appendChild(li);
+  } else {
+    for (const login of logins) {
+      const li = document.createElement("li");
+      const a = document.createElement("a");
+      a.href = "https://github.com/" + encodeURIComponent(login);
+      a.target = "_blank";
+      a.rel = "noopener";
+      a.textContent = login;
+      li.appendChild(a);
+      ul.appendChild(li);
+    }
+  }
+  wrap.appendChild(ul);
+  return wrap;
+}
+
+async function loadSocialGraph(a, b) {
+  socialStatus.textContent = "fetching " + a + " vs " + b + "…";
+  socialSummary.classList.remove("show");
+  socialLists.innerHTML = "";
+  try {
+    const url = "/social-graph?a=" + encodeURIComponent(a) + "&b=" + encodeURIComponent(b);
+    const res = await fetch(url);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      socialStatus.textContent = "error: " + (err.detail || res.status);
+      return;
+    }
+    const data = await res.json();
+    socialStatus.textContent = "";
+    const pct = Math.round((data.combined_score || 0) * 100);
+    socialSummary.textContent = "";
+    const score = document.createElement("span");
+    score.className = "score";
+    score.textContent = pct + "%";
+    socialSummary.appendChild(score);
+    socialSummary.appendChild(document.createTextNode(
+      " combined overlap — " +
+      data.username_a + " (" + data.neighbors_a.follower_count + " followers, " +
+      data.neighbors_a.following_count + " following) ↔ " +
+      data.username_b + " (" + data.neighbors_b.follower_count + " followers, " +
+      data.neighbors_b.following_count + " following)"
+    ));
+    socialSummary.classList.add("show");
+    socialLists.appendChild(renderSocialList("shared followers", data.shared_followers));
+    socialLists.appendChild(renderSocialList("shared following", data.shared_following));
+  } catch (err) {
+    socialStatus.textContent = "network error: " + err.message;
+  }
+}
+
+socialForm.addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  const fd = new FormData(socialForm);
+  const a = (fd.get("a") || "").toString().trim();
+  const b = (fd.get("b") || "").toString().trim();
+  if (!a || !b) return;
+  loadSocialGraph(a, b);
+});
+
 refreshWatchlist();

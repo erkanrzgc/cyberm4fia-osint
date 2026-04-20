@@ -286,6 +286,59 @@ def test_correlate_returns_score_and_signals(client: TestClient, monkeypatch) ->
     assert data["scan_b"]["id"] == 2
 
 
+def test_social_graph_rejects_empty_usernames(client: TestClient) -> None:
+    r = client.get("/social-graph", params={"a": "", "b": "bob"})
+    assert r.status_code == 422
+
+
+def test_social_graph_rejects_unknown_platform(client: TestClient) -> None:
+    r = client.get(
+        "/social-graph", params={"a": "alice", "b": "bob", "platform": "twitter"}
+    )
+    assert r.status_code == 400
+
+
+def test_social_graph_returns_overlap(client: TestClient, monkeypatch) -> None:
+    from core.social_graph import SocialNeighbors
+
+    async def fake_fetch(client_, username, *, max_pages=5, token=None):
+        if username == "alice":
+            return SocialNeighbors(
+                platform="github",
+                username="alice",
+                followers=frozenset({"carol", "dave"}),
+                following=frozenset({"eve"}),
+            )
+        return SocialNeighbors(
+            platform="github",
+            username="alice2",
+            followers=frozenset({"carol", "frank"}),
+            following=frozenset({"eve", "grace"}),
+        )
+
+    monkeypatch.setattr(api_server, "fetch_github_neighbors", fake_fetch)
+
+    class _StubClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return False
+
+    monkeypatch.setattr(api_server, "HTTPClient", _StubClient)
+
+    r = client.get(
+        "/social-graph", params={"a": "alice", "b": "alice2", "platform": "github"}
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["platform"] == "github"
+    assert data["shared_followers"] == ["carol"]
+    assert data["shared_following"] == ["eve"]
+    assert data["neighbors_a"]["username"] == "alice"
+    assert data["neighbors_b"]["username"] == "alice2"
+
+
 def test_graph_returns_cytoscape_payload(client: TestClient, monkeypatch) -> None:
     from core.history import HistoryEntry
 

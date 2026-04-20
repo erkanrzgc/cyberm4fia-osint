@@ -27,8 +27,10 @@ from core.config import ScanConfig
 from core.correlation import correlate
 from core.engine import run_scan
 from core.history import diff_entries, get_latest, get_scan, list_scans, save_scan
+from core.http_client import HTTPClient
 from core.logging_setup import get_logger
 from core.progress import ProgressEmitter, set_emitter
+from core.social_graph import compute_overlap, fetch_github_neighbors
 
 log = get_logger(__name__)
 
@@ -284,6 +286,36 @@ def build_app() -> FastAPI:
             "scan_a": {"id": entry_a.id, "ts": entry_a.ts},
             "scan_b": {"id": entry_b.id, "ts": entry_b.ts},
             **result.to_dict(),
+        }
+
+    @app.get("/social-graph")
+    async def social_graph_compare(
+        a: str,
+        b: str,
+        platform: str = "github",
+        max_pages: int = 5,
+    ) -> dict[str, Any]:
+        """Compare follower/following overlap between two accounts."""
+        a_clean, b_clean = a.strip(), b.strip()
+        if not a_clean or not b_clean:
+            raise HTTPException(status_code=422, detail="both a and b are required")
+        if platform != "github":
+            raise HTTPException(
+                status_code=400,
+                detail=f"platform {platform!r} not supported (only 'github')",
+            )
+        async with HTTPClient() as client:
+            neighbors_a = await fetch_github_neighbors(
+                client, a_clean, max_pages=max_pages
+            )
+            neighbors_b = await fetch_github_neighbors(
+                client, b_clean, max_pages=max_pages
+            )
+        overlap = compute_overlap(neighbors_a, neighbors_b)
+        return {
+            "neighbors_a": neighbors_a.to_dict(),
+            "neighbors_b": neighbors_b.to_dict(),
+            **overlap.to_dict(),
         }
 
     @app.get("/history/{username}")

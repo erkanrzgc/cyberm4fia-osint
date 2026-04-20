@@ -250,6 +250,15 @@ def build_parser() -> argparse.ArgumentParser:
              "Exits after printing the change summary.",
     )
     p.add_argument(
+        "--social-graph",
+        dest="social_graph",
+        type=str,
+        default=None,
+        metavar="USER_A,USER_B",
+        help="Compare GitHub follower/following overlap between two users. "
+             "Exits after printing the shared-connections report.",
+    )
+    p.add_argument(
         "--watchlist-add", dest="watchlist_add", type=str, default=None,
         help="Add a username to the watchlist and exit",
     )
@@ -562,6 +571,52 @@ def _run_compare(spec: str) -> None:
                 )
 
 
+def _run_social_graph(spec: str) -> None:
+    """Handle --social-graph USER_A,USER_B: fetch GitHub neighbours + overlap."""
+    parts = [p.strip() for p in spec.split(",") if p.strip()]
+    if len(parts) != 2:
+        console.print(
+            "  [red]--social-graph expects exactly two usernames, "
+            "comma-separated (e.g. --social-graph alice,bob)[/red]"
+        )
+        sys.exit(2)
+    a_user, b_user = parts
+
+    from core.http_client import HTTPClient
+    from core.social_graph import compute_overlap, fetch_github_neighbors
+
+    async def _go():
+        async with HTTPClient() as client:
+            a = await fetch_github_neighbors(client, a_user)
+            b = await fetch_github_neighbors(client, b_user)
+        return a, b
+
+    console.print(
+        f"  [cyan]Fetching GitHub neighbours for {a_user} and {b_user}…[/cyan]"
+    )
+    neighbors_a, neighbors_b = asyncio.run(_go())
+    overlap = compute_overlap(neighbors_a, neighbors_b)
+
+    pct = int(round(overlap.combined_score * 100))
+    console.print(
+        f"\n  [bold]{a_user}[/bold] ({len(neighbors_a.followers)} followers, "
+        f"{len(neighbors_a.following)} following) ↔ "
+        f"[bold]{b_user}[/bold] ({len(neighbors_b.followers)} followers, "
+        f"{len(neighbors_b.following)} following) — "
+        f"[yellow]{pct}% overlap[/yellow]"
+    )
+    if overlap.shared_followers:
+        console.print("\n  [bold]shared followers[/bold]")
+        for login in overlap.shared_followers:
+            console.print(f"    [green]+ {login}[/green]")
+    if overlap.shared_following:
+        console.print("\n  [bold]shared following[/bold]")
+        for login in overlap.shared_following:
+            console.print(f"    [green]+ {login}[/green]")
+    if not overlap.shared_followers and not overlap.shared_following:
+        console.print("  [dim]no shared connections[/dim]")
+
+
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
@@ -612,6 +667,10 @@ def main() -> None:
 
     if args.compare:
         _run_compare(args.compare)
+        return
+
+    if args.social_graph:
+        _run_social_graph(args.social_graph)
         return
 
     if _handle_watchlist_commands(args):
