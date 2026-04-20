@@ -133,6 +133,29 @@ def get_latest(
     )
 
 
+def get_scan(scan_id: int, *, db_path: Path = DEFAULT_DB_PATH) -> HistoryEntry | None:
+    """Fetch a single scan by primary key, or None if it's gone."""
+    if not db_path.exists():
+        return None
+    conn = _connect(db_path)
+    try:
+        row = conn.execute(
+            "SELECT id, username, ts, found_count, payload FROM scans WHERE id = ?",
+            (scan_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+    if row is None:
+        return None
+    return HistoryEntry(
+        id=row[0],
+        username=row[1],
+        ts=row[2],
+        found_count=row[3],
+        payload=json.loads(row[4]),
+    )
+
+
 @dataclass
 class DiffResult:
     added: list[str]

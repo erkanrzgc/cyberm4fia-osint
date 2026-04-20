@@ -241,6 +241,15 @@ def build_parser() -> argparse.ArgumentParser:
              "(uses the latest scan history for each). Exits after printing.",
     )
     p.add_argument(
+        "--compare",
+        dest="compare",
+        type=str,
+        default=None,
+        metavar="USER_A,USER_B",
+        help="Side-by-side diff of two scans (latest for each user). "
+             "Exits after printing the change summary.",
+    )
+    p.add_argument(
         "--watchlist-add", dest="watchlist_add", type=str, default=None,
         help="Add a username to the watchlist and exit",
     )
@@ -494,6 +503,65 @@ def _run_correlate(spec: str) -> None:
         )
 
 
+def _run_compare(spec: str) -> None:
+    """Handle --compare USER_A,USER_B: deep-diff latest scans and print summary."""
+    parts = [p.strip() for p in spec.split(",") if p.strip()]
+    if len(parts) != 2:
+        console.print(
+            "  [red]--compare expects exactly two usernames, "
+            "comma-separated (e.g. --compare alice,bob)[/red]"
+        )
+        sys.exit(2)
+    a_user, b_user = parts
+
+    from core.compare import compare_payloads
+    from core.history import get_latest
+
+    a_entry = get_latest(a_user)
+    if a_entry is None:
+        console.print(f"  [red]No scan history for {a_user} — run a scan first.[/red]")
+        sys.exit(1)
+    b_entry = get_latest(b_user)
+    if b_entry is None:
+        console.print(f"  [red]No scan history for {b_user} — run a scan first.[/red]")
+        sys.exit(1)
+
+    diff = compare_payloads(a_entry.payload, b_entry.payload)
+    delta = diff.found_count_delta
+    delta_str = f"+{delta}" if delta > 0 else str(delta)
+    console.print(
+        f"\n  [bold]{a_user}[/bold] (#{a_entry.id}, {_fmt_ts(a_entry.ts)})  →  "
+        f"[bold]{b_user}[/bold] (#{b_entry.id}, {_fmt_ts(b_entry.ts)})"
+    )
+    console.print(f"  [dim]{diff.summary}[/dim]  found_count Δ {delta_str}")
+
+    buckets = [
+        ("platforms", diff.platforms),
+        ("emails", diff.emails),
+        ("breaches", diff.breaches),
+        ("phones", diff.phones),
+        ("crypto", diff.crypto),
+        ("geo", diff.geo),
+    ]
+    for title, bucket in buckets:
+        if not bucket.added and not bucket.removed:
+            continue
+        console.print(f"\n  [bold]{title}[/bold]")
+        for item in bucket.added:
+            console.print(f"    [green]+ {item}[/green]")
+        for item in bucket.removed:
+            console.print(f"    [red]- {item}[/red]")
+
+    if diff.platform_changes:
+        console.print("\n  [bold]platform profile changes[/bold]")
+        for pc in diff.platform_changes:
+            console.print(f"    [cyan]{pc.platform}[/cyan]")
+            for fc in pc.changes:
+                console.print(
+                    f"      {fc.field}: [red]{fc.old!r}[/red] → [green]{fc.new!r}[/green]"
+                )
+
+
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
@@ -540,6 +608,10 @@ def main() -> None:
 
     if args.correlate:
         _run_correlate(args.correlate)
+        return
+
+    if args.compare:
+        _run_compare(args.compare)
         return
 
     if _handle_watchlist_commands(args):

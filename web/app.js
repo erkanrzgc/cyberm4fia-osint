@@ -15,6 +15,10 @@ const correlateForm = document.getElementById("correlate-form");
 const correlateStatus = document.getElementById("correlate-status");
 const correlateVerdict = document.getElementById("correlate-verdict");
 const correlateSignals = document.getElementById("correlate-signals");
+const compareForm = document.getElementById("compare-form");
+const compareStatus = document.getElementById("compare-status");
+const compareSummary = document.getElementById("compare-summary");
+const compareSections = document.getElementById("compare-sections");
 
 let cy = null;
 let leafletMap = null;
@@ -358,6 +362,138 @@ async function loadCorrelation(a, b) {
     correlateStatus.textContent = "network error: " + err.message;
   }
 }
+
+function renderCompareBucket(title, bucket) {
+  const wrap = document.createElement("div");
+  wrap.className = "compare-section";
+  const h = document.createElement("h3");
+  const added = bucket.added || [];
+  const removed = bucket.removed || [];
+  h.textContent = title + "  ·  +" + added.length + " / -" + removed.length + "  ·  " + bucket.unchanged_count + " unchanged";
+  wrap.appendChild(h);
+
+  const cols = document.createElement("div");
+  cols.className = "compare-cols";
+
+  const makeCol = (label, items, cls) => {
+    const col = document.createElement("div");
+    col.className = "compare-col " + cls + (items.length ? "" : " empty");
+    const h4 = document.createElement("h4");
+    h4.textContent = label;
+    col.appendChild(h4);
+    const ul = document.createElement("ul");
+    if (!items.length) {
+      const li = document.createElement("li");
+      li.textContent = "(none)";
+      ul.appendChild(li);
+    } else {
+      for (const v of items) {
+        const li = document.createElement("li");
+        li.textContent = v;
+        ul.appendChild(li);
+      }
+    }
+    col.appendChild(ul);
+    return col;
+  };
+
+  cols.appendChild(makeCol("added", added, "added"));
+  cols.appendChild(makeCol("removed", removed, "removed"));
+  wrap.appendChild(cols);
+  return wrap;
+}
+
+function renderPlatformChanges(changes) {
+  if (!changes.length) return null;
+  const wrap = document.createElement("div");
+  wrap.className = "compare-section";
+  const h = document.createElement("h3");
+  h.textContent = "platform profile changes · " + changes.length;
+  wrap.appendChild(h);
+  for (const pc of changes) {
+    const block = document.createElement("div");
+    block.className = "platform-change";
+    const name = document.createElement("div");
+    name.className = "name";
+    name.textContent = pc.platform;
+    block.appendChild(name);
+    const table = document.createElement("table");
+    const thead = document.createElement("tr");
+    for (const h of ["field", "old", "new"]) {
+      const th = document.createElement("th");
+      th.textContent = h;
+      thead.appendChild(th);
+    }
+    table.appendChild(thead);
+    for (const c of pc.changes) {
+      const tr = document.createElement("tr");
+      const f = document.createElement("td");
+      f.textContent = c.field;
+      const o = document.createElement("td");
+      o.className = "old";
+      o.textContent = c.old == null ? "—" : String(c.old);
+      const n = document.createElement("td");
+      n.className = "new";
+      n.textContent = c.new == null ? "—" : String(c.new);
+      tr.appendChild(f);
+      tr.appendChild(o);
+      tr.appendChild(n);
+      table.appendChild(tr);
+    }
+    block.appendChild(table);
+    wrap.appendChild(block);
+  }
+  return wrap;
+}
+
+async function loadCompare(a, b, aScan, bScan) {
+  compareStatus.textContent = "diffing " + a + " vs " + b + "...";
+  compareSummary.className = "";
+  compareSections.innerHTML = "";
+  try {
+    const params = new URLSearchParams({ a, b });
+    if (aScan) params.set("a_scan", aScan);
+    if (bScan) params.set("b_scan", bScan);
+    const r = await fetch("/compare?" + params.toString());
+    if (r.status === 404) { compareStatus.textContent = "no scan history for one of them"; return; }
+    if (!r.ok) { compareStatus.textContent = "error: HTTP " + r.status; return; }
+    const data = await r.json();
+
+    compareStatus.textContent = "diff ready";
+    compareSummary.className = "show";
+    compareSummary.innerHTML =
+      "<span class='scan-ids'>#" + data.scan_a.id + " → #" + data.scan_b.id + "</span>" +
+      "<strong>" + data.summary + "</strong>" +
+      "  ·  found-count Δ " + (data.found_count_delta >= 0 ? "+" : "") + data.found_count_delta;
+
+    const sections = [
+      ["platforms", data.platforms],
+      ["emails", data.emails],
+      ["breaches", data.breaches],
+      ["phones", data.phones],
+      ["crypto wallets", data.crypto],
+      ["geo locations", data.geo],
+    ];
+    for (const [title, bucket] of sections) {
+      compareSections.appendChild(renderCompareBucket(title, bucket));
+    }
+    const pcBlock = renderPlatformChanges(data.platform_changes || []);
+    if (pcBlock) compareSections.appendChild(pcBlock);
+  } catch (err) {
+    compareStatus.textContent = "network error: " + err.message;
+  }
+}
+
+compareForm.addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  const fd = new FormData(compareForm);
+  const a = (fd.get("a") || "").toString().trim();
+  const b = (fd.get("b") || "").toString().trim();
+  if (!a || !b) return;
+  const aScan = (fd.get("a_scan") || "").toString().trim();
+  const bScan = (fd.get("b_scan") || "").toString().trim();
+  loadCompare(a, b, aScan, bScan);
+});
 
 correlateForm.addEventListener("submit", (ev) => {
   ev.preventDefault();

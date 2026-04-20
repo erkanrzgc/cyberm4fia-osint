@@ -177,6 +177,55 @@ footer a { color: var(--accent); text-decoration: none; }
 .panel-graph { grid-column: 1 / -1; }
 .panel-map { grid-column: 1 / -1; }
 .panel-correlate { grid-column: 1 / -1; }
+.panel-compare { grid-column: 1 / -1; }
+
+#compare-status { font-family: var(--mono); font-size: 0.82rem; color: var(--muted); margin-bottom: 0.5rem; }
+#compare-summary {
+  display: none;
+  padding: 0.7rem 1rem;
+  border-radius: 10px;
+  background: var(--surface-hi);
+  border: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  margin-bottom: 0.75rem;
+  color: var(--text);
+}
+#compare-summary.show { display: block; }
+#compare-summary .scan-ids { color: var(--muted); margin-right: 0.75rem; }
+
+#compare-sections { display: grid; gap: 0.75rem; }
+.compare-section {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+}
+.compare-section h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+.compare-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+@media (max-width: 700px) { .compare-cols { grid-template-columns: 1fr; } }
+.compare-col { font-family: var(--mono); font-size: 0.8rem; }
+.compare-col h4 { margin: 0 0 0.25rem; font-size: 0.72rem; color: var(--muted); letter-spacing: 0.05em; }
+.compare-col ul { list-style: none; padding: 0; margin: 0; }
+.compare-col li { padding: 0.2rem 0; border-bottom: 1px dashed var(--border); }
+.compare-col li:last-child { border-bottom: none; }
+.compare-col.added li { color: #9ad0a5; }
+.compare-col.removed li { color: #ff7a7a; text-decoration: line-through; opacity: 0.8; }
+.compare-col.empty li { color: var(--muted); font-style: italic; }
+
+.platform-change { margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--border); }
+.platform-change .name { color: var(--accent); font-weight: 600; font-family: var(--mono); font-size: 0.85rem; }
+.platform-change table { width: 100%; border-collapse: collapse; margin-top: 0.25rem; font-family: var(--mono); font-size: 0.78rem; }
+.platform-change th, .platform-change td { text-align: left; padding: 0.2rem 0.4rem; vertical-align: top; }
+.platform-change th { color: var(--muted); font-weight: 400; font-size: 0.72rem; }
+.platform-change td.old { color: #ff7a7a; }
+.platform-change td.new { color: #9ad0a5; }
 
 #correlate-status { font-family: var(--mono); font-size: 0.82rem; color: var(--muted); margin-bottom: 0.5rem; }
 #correlate-verdict {

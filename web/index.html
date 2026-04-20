@@ -72,6 +72,20 @@
       <div id="map"></div>
     </section>
 
+    <section class="panel panel-compare">
+      <h2>Compare two scans</h2>
+      <form id="compare-form" class="row">
+        <input name="a" placeholder="username A" required />
+        <input name="a_scan" placeholder="scan id A (blank = latest)" />
+        <input name="b" placeholder="username B" required />
+        <input name="b_scan" placeholder="scan id B (blank = latest)" />
+        <button type="submit">Diff</button>
+      </form>
+      <div id="compare-status"></div>
+      <div id="compare-summary"></div>
+      <div id="compare-sections"></div>
+    </section>
+
     <section class="panel panel-correlate">
       <h2>Correlate two usernames</h2>
       <form id="correlate-form" class="row">

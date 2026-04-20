@@ -30,8 +30,15 @@
 - [x] --correlate user_a,user_b CLI flag
 - [x] Web UI panel with verdict badge + signals table
 
+## Sprint 14: Report Comparison UI  ✅
+- [x] core/compare.py — deep payload diff (platforms, emails, breaches,
+  phones, crypto, geo) + per-platform profile_data field changes
+- [x] core/history.get_scan(id) — fetch a specific scan by id
+- [x] GET /compare?a=&b=&a_scan=&b_scan= API endpoint
+- [x] --compare user_a,user_b CLI flag
+- [x] Web UI side-by-side diff panel with added/removed coloring
+
 ## Backlog (oncelik sirasiyla)
-- [ ] Report comparison UI — iki scan'i yan yana diff goruntule
 - [ ] Social graph — follow/follower overlap (GitHub, Twitter API)
 - [ ] OSINT investigation/case yonetimi — bookmark, etiket, not sistemi
 - [ ] Multi-user auth (JWT) — REST API icin

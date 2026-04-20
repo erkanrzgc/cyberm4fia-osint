@@ -22,10 +22,11 @@ from pydantic import BaseModel, Field
 
 from core import watchlist
 from core.api.cytoscape import payload_to_cytoscape
+from core.compare import compare_payloads
 from core.config import ScanConfig
 from core.correlation import correlate
 from core.engine import run_scan
-from core.history import diff_entries, get_latest, list_scans, save_scan
+from core.history import diff_entries, get_latest, get_scan, list_scans, save_scan
 from core.logging_setup import get_logger
 from core.progress import ProgressEmitter, set_emitter
 
@@ -217,6 +218,46 @@ def build_app() -> FastAPI:
             "ts": entry.ts,
             "points": heat,
             "markers": markers,
+        }
+
+    @app.get("/compare")
+    def compare_scans(
+        a: str,
+        b: str,
+        a_scan: int | None = None,
+        b_scan: int | None = None,
+    ) -> dict[str, Any]:
+        """Deep-diff two scans for side-by-side review.
+
+        ``a`` and ``b`` are usernames; optional ``a_scan``/``b_scan``
+        pin to specific history IDs (defaults: latest). Returns the
+        structured diff *plus* both payloads so the UI can render each
+        side without a second round-trip.
+        """
+        a_clean, b_clean = a.strip(), b.strip()
+        if not a_clean or not b_clean:
+            raise HTTPException(status_code=422, detail="both a and b are required")
+        entry_a = get_scan(a_scan) if a_scan is not None else get_latest(a_clean)
+        if entry_a is None:
+            raise HTTPException(status_code=404, detail=f"no scan for {a_clean}")
+        entry_b = get_scan(b_scan) if b_scan is not None else get_latest(b_clean)
+        if entry_b is None:
+            raise HTTPException(status_code=404, detail=f"no scan for {b_clean}")
+        diff = compare_payloads(entry_a.payload, entry_b.payload)
+        return {
+            "scan_a": {
+                "id": entry_a.id,
+                "ts": entry_a.ts,
+                "username": entry_a.username,
+                "payload": entry_a.payload,
+            },
+            "scan_b": {
+                "id": entry_b.id,
+                "ts": entry_b.ts,
+                "username": entry_b.username,
+                "payload": entry_b.payload,
+            },
+            **diff.to_dict(),
         }
 
     @app.get("/correlate")

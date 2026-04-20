@@ -172,6 +172,67 @@ def test_heatmap_folds_duplicate_coords(client: TestClient, monkeypatch) -> None
     assert {"GitHub", "Twitter", "Bluesky"}.issubset(sources)
 
 
+def test_compare_404_when_either_has_no_history(client: TestClient, monkeypatch) -> None:
+    monkeypatch.setattr(api_server, "get_latest", lambda u, before_id=None: None)
+    r = client.get("/compare", params={"a": "alice", "b": "bob"})
+    assert r.status_code == 404
+
+
+def test_compare_returns_diff_and_both_payloads(client: TestClient, monkeypatch) -> None:
+    from core.history import HistoryEntry
+
+    a_payload = {
+        "username": "alice",
+        "found_count": 1,
+        "platforms": [
+            {"platform": "GitHub", "exists": True, "profile_data": {"bio": "old"}}
+        ],
+    }
+    b_payload = {
+        "username": "alice",
+        "found_count": 2,
+        "platforms": [
+            {"platform": "GitHub", "exists": True, "profile_data": {"bio": "new"}},
+            {"platform": "Twitter", "exists": True, "profile_data": {}},
+        ],
+    }
+    a_entry = HistoryEntry(id=1, username="alice", ts=10, found_count=1, payload=a_payload)
+    b_entry = HistoryEntry(id=2, username="alice", ts=20, found_count=2, payload=b_payload)
+
+    monkeypatch.setattr(
+        api_server,
+        "get_latest",
+        lambda u, before_id=None: a_entry if u == "alice" else b_entry,
+    )
+    r = client.get("/compare", params={"a": "alice", "b": "alice2"})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["platforms"]["added"] == ["Twitter"]
+    assert data["found_count_delta"] == 1
+    assert any(pc["platform"] == "GitHub" for pc in data["platform_changes"])
+    assert data["scan_a"]["id"] == 1
+    assert data["scan_b"]["id"] == 2
+    assert data["scan_a"]["payload"]["username"] == "alice"
+
+
+def test_compare_respects_explicit_scan_ids(client: TestClient, monkeypatch) -> None:
+    from core.history import HistoryEntry
+
+    entries = {
+        7: HistoryEntry(id=7, username="alice", ts=100, found_count=0, payload={"username": "alice"}),
+        8: HistoryEntry(id=8, username="alice", ts=200, found_count=1, payload={"username": "alice", "found_count": 1}),
+    }
+    monkeypatch.setattr(api_server, "get_scan", lambda sid: entries.get(sid))
+    # get_latest must not be consulted when both ids are pinned.
+    monkeypatch.setattr(api_server, "get_latest", lambda *a, **kw: None)
+
+    r = client.get("/compare", params={"a": "alice", "b": "alice", "a_scan": 7, "b_scan": 8})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["scan_a"]["id"] == 7
+    assert data["scan_b"]["id"] == 8
+
+
 def test_correlate_requires_both_usernames(client: TestClient) -> None:
     r = client.get("/correlate", params={"a": "alice", "b": ""})
     assert r.status_code == 422
