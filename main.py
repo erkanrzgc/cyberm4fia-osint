@@ -19,16 +19,19 @@ from core.logging_setup import configure_logging, get_logger
 from core.plugins import load_plugins
 from core.reporter import (
     console,
+    export_csv,
     export_html,
     export_json,
     export_misp,
     export_obsidian,
     export_pdf,
     export_stix,
+    export_xlsx,
     pdf_available,
     print_banner,
     print_results,
     print_scan_start,
+    xlsx_available,
 )
 from modules.platforms import get_platform_count
 from utils.helpers import sanitize_username
@@ -105,7 +108,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--proxy", type=str, default=None, help="Proxy address")
     p.add_argument(
         "--output", "-o", type=str, default=None,
-        help="Save results (.json/.html/.pdf/.dot/.misp.json/.stix.json or dir ending with / for Obsidian vault)",
+        help="Save results (.json/.html/.pdf/.csv/.xlsx/.dot/.misp.json/.stix.json or dir ending with / for Obsidian vault)",
     )
     p.add_argument("--timeout", "-t", type=int, default=None, help="Request timeout (seconds)")
     p.add_argument(
@@ -406,6 +409,15 @@ def _save_report(result, path: str) -> None:
             return
         export_pdf(result, path)
         console.print(f"  [green]PDF rapor kaydedildi:[/green] {path}")
+    elif lower.endswith(".csv") or lower.endswith(".csv.zip"):
+        export_csv(result, path)
+    elif lower.endswith(".xlsx"):
+        if not xlsx_available():
+            console.print(
+                "  [yellow]openpyxl not installed; skipping XLSX export.[/yellow]"
+            )
+            return
+        export_xlsx(result, path)
     elif lower.endswith(".misp.json"):
         export_misp(result, path)
         console.print(f"  [green]MISP event kaydedildi:[/green] {path}")

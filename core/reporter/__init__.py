@@ -11,6 +11,11 @@ from core.reporter.console_ui import (
     print_results,
     print_scan_start,
 )
+from core.reporter.csv_export import (
+    export_csv,
+    export_xlsx,
+    xlsx_available,
+)
 from core.reporter.html_export import export_html
 from core.reporter.json_export import export_json
 from core.reporter.misp_export import build_misp_event, export_misp
@@ -22,15 +27,18 @@ __all__ = [
     "build_misp_event",
     "build_stix_bundle",
     "console",
+    "export_csv",
     "export_html",
     "export_json",
     "export_misp",
     "export_obsidian",
     "export_pdf",
     "export_stix",
+    "export_xlsx",
     "pdf_available",
     "print_banner",
     "print_progress",
     "print_results",
     "print_scan_start",
+    "xlsx_available",
 ]

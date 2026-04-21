@@ -61,7 +61,11 @@
 - [x] POST /auth/login (returns bearer token) + GET /auth/me
 - [x] --create-user USER:PASS[:ROLE] CLI (roles: admin/analyst/viewer)
 
+## Sprint 18: CSV/Excel Export  ✅
+- [x] core/reporter/csv_export.py — ZIP bundle of per-section CSVs
+  (summary/platforms/emails/phones/crypto/geo) + openpyxl XLSX multi-sheet
+- [x] --output *.csv / *.csv.zip / *.xlsx dispatch wired into _save_report
+
 ## Backlog (oncelik sirasiyla)
-- [ ] Export: CSV, Excel formatlari
 - [ ] Proxy pool rotasyonu — birden fazla proxy round-robin
 - [ ] Mobile-responsive web UI
