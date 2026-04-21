@@ -61,7 +61,7 @@ main {
 }
 
 .row { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1rem; }
-.row label { flex: 1; min-width: 200px; display: flex; flex-direction: column; font-size: 0.8rem; color: var(--muted); gap: 0.25rem; }
+.row label { flex: 1 1 200px; min-width: 0; display: flex; flex-direction: column; font-size: 0.8rem; color: var(--muted); gap: 0.25rem; }
 
 input[type="text"], input:not([type]) {
   width: 100%;
@@ -407,4 +407,62 @@ footer a { color: var(--accent); text-decoration: none; }
   font-family: var(--mono);
   font-size: 0.78rem;
   color: var(--muted);
+}
+
+/* ── Mobile ───────────────────────────────────────────────────── */
+
+@media (max-width: 720px) {
+  .hero { padding: 1.5rem 1rem 1rem; }
+  .hero h1 { font-size: 1.6rem; }
+  .hero .tag { font-size: 0.85rem; }
+
+  main {
+    margin: 1rem auto;
+    padding: 0 1rem;
+    gap: 1rem;
+  }
+
+  .panel { padding: 1rem; border-radius: 12px; }
+  .panel h2 { font-size: 0.85rem; }
+
+  .row { gap: 0.5rem; }
+  .row label { flex: 1 1 100%; }
+
+  .checkbox-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.4rem 0.75rem;
+    font-size: 0.8rem;
+  }
+
+  button { width: 100%; padding: 0.7rem 1rem; }
+  .row button { width: auto; }
+
+  #scan-output, #scan-log { font-size: 0.72rem; }
+  #scan-log { max-height: 140px; }
+
+  #map { height: 280px; }
+  #cy { height: 320px; }
+
+  #case-detail { font-size: 0.8rem; padding: 0.6rem 0.8rem; }
+  #case-detail form.inline-form { flex-direction: column; }
+  #case-detail form.inline-form button { width: 100%; }
+  #case-detail .case-actions { flex-wrap: wrap; }
+
+  .panel-graph, .panel-map, .panel-correlate,
+  .panel-compare, .panel-social, .panel-cases { grid-column: auto; }
+
+  /* Wide tables (platform diffs) should scroll inside their panel. */
+  .platform-change { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .platform-change table { min-width: 420px; }
+
+  footer { padding: 1rem; font-size: 0.8rem; }
+}
+
+@media (max-width: 420px) {
+  .hero h1 { font-size: 1.35rem; }
+  .checkbox-grid { grid-template-columns: 1fr; }
+}
+
+@media (hover: none) {
+  button:hover { transform: none; box-shadow: none; }
 }

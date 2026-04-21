@@ -75,5 +75,10 @@
   (dedup + merge with --proxy fallback)
 - [x] ScanConfig.proxies plumbed through engine
 
+## Sprint 20: Mobile-Responsive Web UI  ✅
+- [x] web/style.css: 720px + 420px breakpoints (stacked forms, single-column
+  grids, reduced hero/map/cy heights, full-width buttons, touch-friendly
+  targets, horizontal scroll for platform-diff tables)
+- [x] (hover:none) override disables hover transforms on touch devices
+
 ## Backlog (oncelik sirasiyla)
-- [ ] Mobile-responsive web UI
