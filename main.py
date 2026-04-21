@@ -15,6 +15,7 @@ from core.config import ScanConfig
 from core.engine import run_scan
 from core.graph_export import export_dot
 from core.history import diff_entries, get_latest, list_scans, save_scan
+from core.search import index_scan, search as history_search
 from core.logging_setup import configure_logging, get_logger
 from core.plugins import load_plugins
 from core.reporter import (
@@ -279,6 +280,15 @@ def build_parser() -> argparse.ArgumentParser:
              "Exits after printing the shared-connections report.",
     )
     p.add_argument(
+        "--search-history",
+        dest="search_history",
+        type=str,
+        default=None,
+        metavar="QUERY",
+        help="Full-text search across saved scan history (FTS5). "
+             "Exits after printing the top matches.",
+    )
+    p.add_argument(
         "--case-new", dest="case_new", type=str, default=None, metavar="NAME",
         help="Create a new investigation case and exit",
     )
@@ -505,10 +515,14 @@ async def _run_bulk_mode(usernames: list[str], args, from_watchlist: bool) -> No
     for username, result in zip(usernames, results, strict=True):
         print_results(result)
         if not args.no_history:
+            payload = result.to_dict()
             try:
-                save_scan(result.to_dict(), ts=int(time.time()))
+                scan_id = save_scan(payload, ts=int(time.time()))
             except (OSError, ValueError) as exc:
                 log.warning("history: save failed for %s: %s", username, exc)
+            else:
+                if scan_id > 0:
+                    index_scan(scan_id, payload)
         if from_watchlist:
             try:
                 watchlist.mark_scanned(username)
@@ -828,6 +842,36 @@ def _run_social_graph(spec: str) -> None:
         console.print("  [dim]no shared connections[/dim]")
 
 
+def _run_search_history(query: str) -> None:
+    """Handle --search-history QUERY: FTS5 full-text search across saved scans."""
+    q = query.strip()
+    if not q:
+        console.print("  [red]--search-history: query is empty[/red]")
+        sys.exit(2)
+
+    hits = history_search(q, limit=20)
+    if not hits:
+        console.print(f"  [yellow]no matches for[/yellow] [bold]{q}[/bold]")
+        return
+
+    console.print(
+        f"\n  [bold]{len(hits)} match{'es' if len(hits) != 1 else ''}[/bold] "
+        f"for [cyan]{q}[/cyan]\n"
+    )
+    for hit in hits:
+        when = datetime.fromtimestamp(hit.ts, tz=timezone.utc).strftime(
+            "%Y-%m-%d %H:%M"
+        )
+        console.print(
+            f"  [green]#{hit.id}[/green] "
+            f"[bold]{hit.username}[/bold] "
+            f"[dim]{when}[/dim] "
+            f"({hit.found_count} found)"
+        )
+        if hit.snippet:
+            console.print(f"    [dim]{hit.snippet}[/dim]")
+
+
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
@@ -882,6 +926,10 @@ def main() -> None:
 
     if args.social_graph:
         _run_social_graph(args.social_graph)
+        return
+
+    if args.search_history:
+        _run_search_history(args.search_history)
         return
 
     if args.create_user:
@@ -940,10 +988,14 @@ def main() -> None:
     print_results(result)
 
     if not args.no_history:
+        payload = result.to_dict()
         try:
-            save_scan(result.to_dict(), ts=int(time.time()))
+            scan_id = save_scan(payload, ts=int(time.time()))
         except (OSError, ValueError) as exc:
             log.warning("history: save failed: %s", exc)
+        else:
+            if scan_id > 0:
+                index_scan(scan_id, payload)
 
     if args.diff:
         _print_diff(username, result)

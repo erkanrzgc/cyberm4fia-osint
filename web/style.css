@@ -180,6 +180,18 @@ footer a { color: var(--accent); text-decoration: none; }
 .panel-compare { grid-column: 1 / -1; }
 .panel-social { grid-column: 1 / -1; }
 .panel-cases { grid-column: 1 / -1; }
+.panel-search { grid-column: 1 / -1; }
+
+#search-status { font-family: var(--mono); font-size: 0.82rem; color: var(--muted); margin-bottom: 0.5rem; }
+#search-results { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+#search-results .search-hit { padding: 0.55rem 0.75rem; border: 1px solid var(--border, #2a2a2a); border-radius: 0.35rem; background: var(--panel-alt, rgba(255,255,255,0.02)); }
+#search-results .search-hit-head { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: baseline; font-size: 0.9rem; }
+#search-results .search-hit-id { font-family: var(--mono); color: var(--muted); font-size: 0.8rem; }
+#search-results .search-hit-ts { font-family: var(--mono); color: var(--muted); font-size: 0.8rem; margin-left: auto; }
+#search-results .search-hit-count { font-family: var(--mono); font-size: 0.75rem; padding: 0.05rem 0.4rem; border-radius: 0.25rem; background: rgba(120, 200, 120, 0.15); color: #7fbf7f; }
+#search-results .search-hit-snippet { margin-top: 0.35rem; font-family: var(--mono); font-size: 0.82rem; color: var(--muted); white-space: pre-wrap; word-break: break-word; }
+#search-results .search-hit-snippet mark { background: rgba(255, 210, 90, 0.35); color: inherit; padding: 0 0.12rem; border-radius: 0.15rem; }
+
 
 #case-status { font-family: var(--mono); font-size: 0.82rem; color: var(--muted); margin-bottom: 0.5rem; }
 #case-list { list-style: none; padding: 0; margin: 0; }

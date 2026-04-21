@@ -140,6 +140,46 @@ def test_is_available_true_when_deps_installed() -> None:
     assert api.is_available() is True
 
 
+def test_search_endpoint_rejects_empty_query(client: TestClient) -> None:
+    r = client.get("/search", params={"q": "   "})
+    assert r.status_code == 400
+
+
+def test_search_endpoint_returns_hits(
+    client: TestClient, tmp_path: Path, monkeypatch
+) -> None:
+    from core import history, search as search_mod
+    hist_db = tmp_path / "history.sqlite3"
+    monkeypatch.setattr(history, "DEFAULT_DB_PATH", hist_db)
+    monkeypatch.setattr(search_mod, "DEFAULT_DB_PATH", hist_db)
+    for fn in (history.save_scan, history.list_scans, history.get_latest,
+               history.get_scan):
+        monkeypatch.setitem(fn.__kwdefaults__, "db_path", hist_db)
+    for fn in (search_mod.search, search_mod.index_scan, search_mod.reindex):
+        monkeypatch.setitem(fn.__kwdefaults__, "db_path", hist_db)
+
+    payload = {
+        "username": "alice",
+        "found_count": 1,
+        "platforms": [
+            {
+                "platform": "GitHub",
+                "url": "https://github.com/alice",
+                "exists": True,
+                "profile_data": {"bio": "distinctivephrase"},
+            }
+        ],
+    }
+    scan_id = history.save_scan(payload, ts=1000)
+    search_mod.index_scan(scan_id, payload)
+
+    r = client.get("/search", params={"q": "distinctivephrase"})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["count"] == 1
+    assert data["hits"][0]["username"] == "alice"
+
+
 def test_scan_stream_emits_events(client: TestClient) -> None:
     with client.stream(
         "POST",

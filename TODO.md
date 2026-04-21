@@ -81,4 +81,13 @@
   targets, horizontal scroll for platform-diff tables)
 - [x] (hover:none) override disables hover transforms on touch devices
 
+## Sprint 21: Scan History Full-Text Search  ✅
+- [x] core/search.py — SQLite FTS5 virtual table over scan payloads
+  (bm25 ranking, snippet extraction, lazy reindex for legacy rows)
+- [x] save_scan + index_scan hook wired into main CLI, bulk mode,
+  scheduler loop, and /scan + /scan/stream API endpoints
+- [x] GET /search?q=&username=&limit= API endpoint
+- [x] --search-history QUERY CLI flag
+- [x] Web UI panel with query + per-user scope + highlighted snippets
+
 ## Backlog (oncelik sirasiyla)

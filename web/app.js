@@ -822,3 +822,81 @@ caseCreateForm.addEventListener("submit", async (ev) => {
 
 refreshCases();
 refreshWatchlist();
+
+const searchForm = document.getElementById("search-form");
+const searchStatus = document.getElementById("search-status");
+const searchResults = document.getElementById("search-results");
+
+function fmtSearchTs(ts) {
+  try {
+    return new Date(ts * 1000).toISOString().replace("T", " ").slice(0, 16);
+  } catch (_) {
+    return String(ts);
+  }
+}
+
+function renderSearchSnippet(raw) {
+  return raw
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll("[", "<mark>")
+    .replaceAll("]", "</mark>");
+}
+
+searchForm.addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const fd = new FormData(searchForm);
+  const q = (fd.get("q") || "").toString().trim();
+  const username = (fd.get("username") || "").toString().trim();
+  searchResults.innerHTML = "";
+  if (!q) {
+    searchStatus.textContent = "empty query";
+    return;
+  }
+  searchStatus.textContent = "searching…";
+  const params = new URLSearchParams({ q: q, limit: "20" });
+  if (username) params.set("username", username);
+  try {
+    const res = await fetch("/search?" + params.toString());
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      searchStatus.textContent = "error: " + (err.detail || res.status);
+      return;
+    }
+    const data = await res.json();
+    const n = data.count || 0;
+    searchStatus.textContent = n + " match" + (n === 1 ? "" : "es");
+    for (const hit of data.hits || []) {
+      const li = document.createElement("li");
+      li.className = "search-hit";
+      const head = document.createElement("div");
+      head.className = "search-hit-head";
+      const who = document.createElement("strong");
+      who.textContent = hit.username;
+      const idTag = document.createElement("span");
+      idTag.className = "search-hit-id";
+      idTag.textContent = "#" + hit.id;
+      const when = document.createElement("span");
+      when.className = "search-hit-ts";
+      when.textContent = fmtSearchTs(hit.ts);
+      const badge = document.createElement("span");
+      badge.className = "search-hit-count";
+      badge.textContent = hit.found_count + " found";
+      head.appendChild(who);
+      head.appendChild(idTag);
+      head.appendChild(when);
+      head.appendChild(badge);
+      li.appendChild(head);
+      if (hit.snippet) {
+        const snip = document.createElement("div");
+        snip.className = "search-hit-snippet";
+        snip.innerHTML = renderSearchSnippet(hit.snippet);
+        li.appendChild(snip);
+      }
+      searchResults.appendChild(li);
+    }
+  } catch (err) {
+    searchStatus.textContent = "network error: " + err.message;
+  }
+});

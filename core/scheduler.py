@@ -21,6 +21,7 @@ from core.logging_setup import get_logger
 from core.models import ScanResult
 from core.notify import Notification, build_default_notifiers, notify_all
 from core.notify.base import Notifier
+from core.search import index_scan
 
 log = get_logger(__name__)
 
@@ -80,6 +81,9 @@ async def _scan_one(
     except (OSError, ValueError) as exc:
         log.warning("scheduler: could not save scan for %s: %s", username, exc)
         scan_id = -1
+    else:
+        if scan_id > 0:
+            index_scan(scan_id, payload, db_path=hist_db)
 
     watchlist.mark_scanned(username, ts=now, db_path=wl_db)
 

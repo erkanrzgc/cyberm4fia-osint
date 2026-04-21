@@ -27,6 +27,7 @@ from core.config import ScanConfig
 from core.correlation import correlate
 from core.engine import run_scan
 from core.history import diff_entries, get_latest, get_scan, list_scans, save_scan
+from core.search import index_scan, search as history_search
 from core.http_client import HTTPClient
 from core.logging_setup import get_logger
 from core.progress import ProgressEmitter, set_emitter
@@ -227,9 +228,12 @@ def build_app() -> FastAPI:
         payload = result.to_dict()
         if req.save_history:
             try:
-                save_scan(payload, ts=int(time.time()))
+                scan_id = save_scan(payload, ts=int(time.time()))
             except (OSError, ValueError) as exc:
                 log.warning("history: save failed: %s", exc)
+            else:
+                if scan_id > 0:
+                    index_scan(scan_id, payload)
         return payload
 
     @app.post("/scan/stream")
@@ -250,9 +254,12 @@ def build_app() -> FastAPI:
                 payload = result.to_dict()
                 if req.save_history:
                     try:
-                        save_scan(payload, ts=int(time.time()))
+                        scan_id = save_scan(payload, ts=int(time.time()))
                     except (OSError, ValueError) as exc:
                         log.warning("history: save failed: %s", exc)
+                    else:
+                        if scan_id > 0:
+                            index_scan(scan_id, payload)
                 emitter.emit_result(payload)
             finally:
                 set_emitter(None)
@@ -462,6 +469,23 @@ def build_app() -> FastAPI:
             "current_id": current.id,
             "added": list(d.added),
             "removed": list(d.removed),
+        }
+
+    @app.get("/search")
+    def search_history(
+        q: str,
+        limit: int = 20,
+        username: str | None = None,
+    ) -> dict[str, Any]:
+        query = (q or "").strip()
+        if not query:
+            raise HTTPException(status_code=400, detail="q is required")
+        capped = max(1, min(int(limit), 100))
+        hits = history_search(query, limit=capped, username=username)
+        return {
+            "query": query,
+            "count": len(hits),
+            "hits": [h.to_dict() for h in hits],
         }
 
     @app.get("/cases")
