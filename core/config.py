@@ -27,6 +27,29 @@ RETRY_DELAY = _env_float("CYBERM4FIA_RETRY_DELAY", 1.0)
 RATE_LIMIT_DELAY = _env_float("CYBERM4FIA_RATE_LIMIT_DELAY", 0.1)
 PER_HOST_CONCURRENCY = _env_int("CYBERM4FIA_PER_HOST_CONCURRENCY", 4)
 
+
+def _collect_proxy_pool(args) -> tuple[str, ...]:
+    """Merge --proxy / --proxy-pool / --proxy-file into a deduped tuple."""
+    collected: list[str] = []
+    raw_pool = getattr(args, "proxy_pool", None)
+    if raw_pool:
+        collected.extend(p.strip() for p in raw_pool.split(",") if p.strip())
+    pool_file = getattr(args, "proxy_file", None)
+    if pool_file:
+        from core.proxy_pool import load_from_file
+
+        collected.extend(load_from_file(pool_file))
+    single = getattr(args, "proxy", None)
+    if single and single not in collected:
+        collected.append(single)
+    seen: set[str] = set()
+    unique: list[str] = []
+    for p in collected:
+        if p not in seen:
+            seen.add(p)
+            unique.append(p)
+    return tuple(unique)
+
 BANNER = r"""
  ██████╗██╗   ██╗██████╗ ███████╗██████╗ ███╗   ███╗██╗  ██╗███████╗██╗ █████╗
 ██╔════╝╚██╗ ██╔╝██╔══██╗██╔════╝██╔══██╗████╗ ████║██║  ██║██╔════╝██║██╔══██╗
@@ -86,6 +109,7 @@ class ScanConfig:
     crypto_addresses: tuple[str, ...] = ()
     enrichment: bool = True
     proxy: str | None = None
+    proxies: tuple[str, ...] = ()
     tor: bool = False
     categories: tuple[str, ...] | None = None
     request_timeout: int = REQUEST_TIMEOUT
@@ -165,6 +189,7 @@ class ScanConfig:
             reverse_image=reverse_image,
             past_usernames=past_usernames,
             proxy=args.proxy,
+            proxies=_collect_proxy_pool(args),
             tor=args.tor,
             categories=categories,
             request_timeout=args.timeout or REQUEST_TIMEOUT,

@@ -66,6 +66,14 @@
   (summary/platforms/emails/phones/crypto/geo) + openpyxl XLSX multi-sheet
 - [x] --output *.csv / *.csv.zip / *.xlsx dispatch wired into _save_report
 
+## Sprint 19: Proxy Pool Rotation  ✅
+- [x] core/proxy_pool.py — thread-safe round-robin with dead-proxy pruning
+  (max_consecutive_failures, all-dead resurrection, success resets counter)
+- [x] HTTPClient per-request health feedback (record success/failure around
+  get/get_json/get_bytes)
+- [x] --proxy-pool "p1,p2,..." and --proxy-file PATH CLI flags
+  (dedup + merge with --proxy fallback)
+- [x] ScanConfig.proxies plumbed through engine
+
 ## Backlog (oncelik sirasiyla)
-- [ ] Proxy pool rotasyonu — birden fazla proxy round-robin
 - [ ] Mobile-responsive web UI

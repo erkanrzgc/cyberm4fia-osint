@@ -28,6 +28,7 @@ from core.config import (
     RETRY_DELAY,
 )
 from core.logging_setup import get_logger
+from core.proxy_pool import ProxyPool
 from modules.stealth import DomainRateBucket, fingerprint_headers, pick_ua
 from modules.stealth.tor_control import CircuitRotator
 
@@ -55,6 +56,8 @@ class HTTPClient:
             self.proxies = [proxy]
         else:
             self.proxies = []
+        http_only = tuple(p for p in self.proxies if not p.startswith("socks"))
+        self._pool = ProxyPool(proxies=http_only) if http_only else None
         self._proxy_cycle = itertools.cycle(self.proxies) if self.proxies else None
         self._semaphore = asyncio.Semaphore(MAX_CONCURRENT)
         self._host_semaphores: dict[str, asyncio.Semaphore] = defaultdict(
@@ -93,11 +96,18 @@ class HTTPClient:
     # ── helpers ────────────────────────────────────────────────
 
     def _next_http_proxy(self) -> str | None:
-        """Return the next HTTP/HTTPS proxy; SOCKS handled at connector level."""
-        if not self._proxy_cycle:
+        """Return the next healthy HTTP/HTTPS proxy; SOCKS handled at connector level."""
+        if self._pool is None:
             return None
-        proxy = next(self._proxy_cycle)
-        return None if proxy.startswith("socks") else proxy
+        return self._pool.next()
+
+    def _record_proxy_result(self, proxy: str | None, *, success: bool) -> None:
+        if self._pool is None or not proxy:
+            return
+        if success:
+            self._pool.record_success(proxy)
+        else:
+            self._pool.record_failure(proxy)
 
     def _require_session(self) -> aiohttp.ClientSession:
         if self._session is None:
@@ -167,25 +177,29 @@ class HTTPClient:
         try:
             for attempt in range(RETRY_COUNT + 1):
                 start = time.monotonic()
+                proxy = self._next_http_proxy()
                 try:
                     async with session.get(
                         url,
                         headers=merged,
                         allow_redirects=allow_redirects,
-                        proxy=self._next_http_proxy(),
+                        proxy=proxy,
                     ) as resp:
                         elapsed = time.monotonic() - start
                         body = await resp.text(errors="replace")
                         await self._post_request(url, resp.status, resp)
+                        self._record_proxy_result(proxy, success=True)
                         return resp.status, body, elapsed
                 except asyncio.TimeoutError:
                     elapsed = time.monotonic() - start
                     log.debug("timeout on %s (attempt %d)", url, attempt + 1)
+                    self._record_proxy_result(proxy, success=False)
                     if attempt == RETRY_COUNT:
                         return 0, "", elapsed
                 except (aiohttp.ClientError, OSError) as exc:
                     elapsed = time.monotonic() - start
                     log.debug("network error on %s: %s", url, exc)
+                    self._record_proxy_result(proxy, success=False)
                     if attempt == RETRY_COUNT:
                         return -1, "", elapsed
                 await asyncio.sleep(RETRY_DELAY * (attempt + 1))
@@ -204,14 +218,16 @@ class HTTPClient:
         try:
             for attempt in range(RETRY_COUNT + 1):
                 start = time.monotonic()
+                proxy = self._next_http_proxy()
                 try:
                     async with session.get(
                         url,
                         headers=merged,
-                        proxy=self._next_http_proxy(),
+                        proxy=proxy,
                     ) as resp:
                         elapsed = time.monotonic() - start
                         await self._post_request(url, resp.status, resp)
+                        self._record_proxy_result(proxy, success=True)
                         if resp.status == 200:
                             data = await resp.json(content_type=None)
                             return resp.status, data, elapsed
@@ -219,11 +235,13 @@ class HTTPClient:
                 except asyncio.TimeoutError:
                     elapsed = time.monotonic() - start
                     log.debug("json timeout on %s", url)
+                    self._record_proxy_result(proxy, success=False)
                     if attempt == RETRY_COUNT:
                         return 0, None, elapsed
                 except (aiohttp.ClientError, OSError, ValueError) as exc:
                     elapsed = time.monotonic() - start
                     log.debug("json error on %s: %s", url, exc)
+                    self._record_proxy_result(proxy, success=False)
                     if attempt == RETRY_COUNT:
                         return -1, None, elapsed
                 await asyncio.sleep(RETRY_DELAY * (attempt + 1))
@@ -241,25 +259,29 @@ class HTTPClient:
         try:
             for attempt in range(RETRY_COUNT + 1):
                 start = time.monotonic()
+                proxy = self._next_http_proxy()
                 try:
                     async with session.get(
                         url,
                         headers=merged,
-                        proxy=self._next_http_proxy(),
+                        proxy=proxy,
                     ) as resp:
                         elapsed = time.monotonic() - start
                         await self._post_request(url, resp.status, resp)
+                        self._record_proxy_result(proxy, success=True)
                         if resp.status == 200:
                             data = await resp.read()
                             return resp.status, data, elapsed
                         return resp.status, None, elapsed
                 except asyncio.TimeoutError:
                     elapsed = time.monotonic() - start
+                    self._record_proxy_result(proxy, success=False)
                     if attempt == RETRY_COUNT:
                         return 0, None, elapsed
                 except (aiohttp.ClientError, OSError) as exc:
                     elapsed = time.monotonic() - start
                     log.debug("bytes error on %s: %s", url, exc)
+                    self._record_proxy_result(proxy, success=False)
                     if attempt == RETRY_COUNT:
                         return -1, None, elapsed
                 await asyncio.sleep(RETRY_DELAY * (attempt + 1))

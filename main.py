@@ -107,6 +107,23 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--proxy", type=str, default=None, help="Proxy address")
     p.add_argument(
+        "--proxy-pool",
+        dest="proxy_pool",
+        type=str,
+        default=None,
+        metavar="P1,P2,...",
+        help="Comma-separated list of HTTP/HTTPS proxies rotated round-robin "
+             "with dead-proxy pruning",
+    )
+    p.add_argument(
+        "--proxy-file",
+        dest="proxy_file",
+        type=str,
+        default=None,
+        metavar="PATH",
+        help="Newline-delimited proxy file (#-prefixed lines are comments)",
+    )
+    p.add_argument(
         "--output", "-o", type=str, default=None,
         help="Save results (.json/.html/.pdf/.csv/.xlsx/.dot/.misp.json/.stix.json or dir ending with / for Obsidian vault)",
     )

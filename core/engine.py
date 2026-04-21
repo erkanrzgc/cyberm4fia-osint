@@ -784,7 +784,8 @@ async def run_scan(cfg: ScanConfig) -> ScanResult:
     platforms = _select_platforms(cfg.categories)
 
     async with HTTPClient(
-        proxy=cfg.proxy,
+        proxy=cfg.proxy if not cfg.proxies else None,
+        proxies=list(cfg.proxies) if cfg.proxies else None,
         tor=cfg.tor,
         request_timeout=cfg.request_timeout,
         fingerprint=cfg.fingerprint,
