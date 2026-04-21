@@ -14,13 +14,13 @@ import time
 from pathlib import Path
 from typing import Any, AsyncIterator
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from core import cases, watchlist
+from core import auth, cases, watchlist
 from core.api.cytoscape import payload_to_cytoscape
 from core.compare import compare_payloads
 from core.config import ScanConfig
@@ -94,6 +94,11 @@ class CaseBookmarkRequest(BaseModel):
     scan_id: int | None = None
 
 
+class LoginRequest(BaseModel):
+    username: str = Field(..., min_length=1)
+    password: str = Field(..., min_length=1)
+
+
 def _cfg_from_request(req: ScanRequest) -> ScanConfig:
     return ScanConfig(
         username=req.username.strip(),
@@ -134,9 +139,81 @@ def build_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    # Routes that remain public even when OSINT_AUTH_REQUIRED is set.
+    _PUBLIC_PATHS = frozenset({"/", "/health", "/auth/login", "/docs",
+                               "/openapi.json", "/redoc"})
+
+    @app.middleware("http")
+    async def _auth_gate(request: Request, call_next):
+        if not auth.is_auth_required():
+            return await call_next(request)
+        path = request.url.path
+        if (
+            path in _PUBLIC_PATHS
+            or path.startswith("/static/")
+            or request.method == "OPTIONS"
+        ):
+            return await call_next(request)
+        header = request.headers.get("authorization", "")
+        if not header.lower().startswith("bearer "):
+            return JSONResponse(
+                {"detail": "missing bearer token"}, status_code=401
+            )
+        token = header.split(" ", 1)[1].strip()
+        try:
+            payload = auth.decode_token(token, secret=auth.get_secret())
+        except auth.AuthError as exc:
+            return JSONResponse(
+                {"detail": f"invalid token: {exc}"}, status_code=401
+            )
+        request.state.user = payload
+        return await call_next(request)
+
     @app.get("/health")
     def health() -> dict[str, Any]:
         return {"status": "ok", "ts": int(time.time())}
+
+    @app.post("/auth/login")
+    def auth_login(req: LoginRequest) -> dict[str, Any]:
+        user = auth.authenticate(req.username, req.password)
+        if user is None:
+            raise HTTPException(status_code=401, detail="invalid credentials")
+        ttl = 3600
+        token = auth.issue_token(
+            user_id=user.id,
+            username=user.username,
+            role=user.role,
+            secret=auth.get_secret(),
+            ttl=ttl,
+        )
+        return {
+            "access_token": token,
+            "token_type": "bearer",
+            "expires_in": ttl,
+            "user": user.to_dict(),
+        }
+
+    @app.get("/auth/me")
+    def auth_me(request: Request) -> dict[str, Any]:
+        # When the gate is off we have no request.state.user. Require the
+        # header ourselves so /auth/me always needs a valid token — the
+        # gate is *about the rest of the surface*, not this endpoint.
+        header = request.headers.get("authorization", "")
+        if not header.lower().startswith("bearer "):
+            raise HTTPException(status_code=401, detail="missing bearer token")
+        token = header.split(" ", 1)[1].strip()
+        try:
+            payload = auth.decode_token(token, secret=auth.get_secret())
+        except auth.AuthError as exc:
+            raise HTTPException(
+                status_code=401, detail=f"invalid token: {exc}"
+            ) from exc
+        return {
+            "username": payload.get("sub"),
+            "uid": payload.get("uid"),
+            "role": payload.get("role"),
+            "exp": payload.get("exp"),
+        }
 
     @app.post("/scan")
     async def scan(req: ScanRequest) -> dict[str, Any]:

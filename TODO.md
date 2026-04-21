@@ -53,8 +53,15 @@
 - [x] --case-new/--case-list/--case-show/--case-note/--case-bookmark/--case-close CLI
 - [x] Web UI panel: case list + detail with inline note/bookmark forms
 
+## Sprint 17: Multi-user JWT Auth  ✅
+- [x] core/auth.py — zero-dep PBKDF2-SHA256 user store + HS256 JWT
+  (issue/decode, timing-safe compare, decoy-hash on unknown user)
+- [x] Opt-in middleware gate (OSINT_AUTH_REQUIRED env var);
+  OSINT_AUTH_SECRET for signing key
+- [x] POST /auth/login (returns bearer token) + GET /auth/me
+- [x] --create-user USER:PASS[:ROLE] CLI (roles: admin/analyst/viewer)
+
 ## Backlog (oncelik sirasiyla)
-- [ ] Multi-user auth (JWT) — REST API icin
 - [ ] Export: CSV, Excel formatlari
 - [ ] Proxy pool rotasyonu — birden fazla proxy round-robin
 - [ ] Mobile-responsive web UI

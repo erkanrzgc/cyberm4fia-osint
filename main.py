@@ -284,6 +284,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Mark a case as closed and exit",
     )
     p.add_argument(
+        "--create-user",
+        dest="create_user",
+        type=str,
+        default=None,
+        metavar="USER:PASS[:ROLE]",
+        help="Create an auth user and exit (role defaults to analyst; "
+             "valid: admin/analyst/viewer). Enable the gate with OSINT_AUTH_REQUIRED=1.",
+    )
+    p.add_argument(
         "--watchlist-add", dest="watchlist_add", type=str, default=None,
         help="Add a username to the watchlist and exit",
     )
@@ -713,6 +722,37 @@ def _run_case_commands(args) -> bool:
     return False
 
 
+def _run_create_user(spec: str) -> None:
+    """Handle --create-user USER:PASS[:ROLE]: persist a new auth user."""
+    from core import auth
+
+    parts = spec.split(":", 2)
+    if len(parts) < 2 or not parts[0].strip() or not parts[1]:
+        console.print(
+            "  [red]--create-user expects 'USER:PASS' or 'USER:PASS:ROLE' "
+            "(e.g. 'alice:s3cret' or 'alice:s3cret:admin')[/red]"
+        )
+        sys.exit(2)
+    username = parts[0].strip()
+    password = parts[1]
+    role = parts[2].strip() if len(parts) == 3 and parts[2].strip() else "analyst"
+    if role not in auth.VALID_ROLES:
+        console.print(
+            f"  [red]--create-user: role must be one of "
+            f"{sorted(auth.VALID_ROLES)}[/red]"
+        )
+        sys.exit(2)
+    try:
+        user = auth.create_user(username, password, role=role)
+    except ValueError as exc:
+        console.print(f"  [red]--create-user: {exc}[/red]")
+        sys.exit(1)
+    console.print(
+        f"  [green]Created user[/green] #{user.id} "
+        f"[bold]{user.username}[/bold] role=[cyan]{user.role}[/cyan]"
+    )
+
+
 def _run_social_graph(spec: str) -> None:
     """Handle --social-graph USER_A,USER_B: fetch GitHub neighbours + overlap."""
     parts = [p.strip() for p in spec.split(",") if p.strip()]
@@ -813,6 +853,10 @@ def main() -> None:
 
     if args.social_graph:
         _run_social_graph(args.social_graph)
+        return
+
+    if args.create_user:
+        _run_create_user(args.create_user)
         return
 
     if _run_case_commands(args):

@@ -11,7 +11,7 @@ pytest.importorskip("httpx")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from core import api, cases, watchlist  # noqa: E402
+from core import api, auth, cases, watchlist  # noqa: E402
 from core.api import server as api_server  # noqa: E402
 from core.models import PlatformResult, ScanResult  # noqa: E402
 
@@ -39,6 +39,18 @@ def client(tmp_path: Path, monkeypatch):
         cases.add_bookmark, cases.list_bookmarks, cases.delete_bookmark,
     ):
         monkeypatch.setitem(fn.__kwdefaults__, "db_path", cases_db)
+
+    # Users DB also isolated to tmp.
+    users_db = tmp_path / "users.sqlite3"
+    monkeypatch.setattr(auth, "DEFAULT_DB_PATH", users_db)
+    for fn in (
+        auth.create_user, auth.get_user, auth.list_users, auth.authenticate,
+    ):
+        monkeypatch.setitem(fn.__kwdefaults__, "db_path", users_db)
+    # Pin the JWT secret so tokens are deterministic across the test.
+    monkeypatch.setenv("OSINT_AUTH_SECRET", "test-secret")
+    # Make sure no stray env var forces auth on.
+    monkeypatch.delenv("OSINT_AUTH_REQUIRED", raising=False)
 
     async def fake_run_scan(cfg):
         r = ScanResult(username=cfg.username)
@@ -478,3 +490,85 @@ def test_cases_delete_note_and_bookmark(client: TestClient) -> None:
     assert client.delete(f"/cases/bookmarks/{bm_id}").status_code == 200
     assert client.delete(f"/cases/notes/{note_id}").status_code == 404
     assert client.delete(f"/cases/bookmarks/{bm_id}").status_code == 404
+
+
+def test_auth_login_success_and_token_shape(client: TestClient) -> None:
+    auth.create_user("alice", "s3cret", role="analyst")
+    r = client.post("/auth/login", json={"username": "alice", "password": "s3cret"})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["token_type"] == "bearer"
+    assert data["expires_in"] > 0
+    assert data["user"]["username"] == "alice"
+    # Token parses back.
+    payload = auth.decode_token(data["access_token"], secret="test-secret")
+    assert payload["sub"] == "alice"
+
+
+def test_auth_login_rejects_wrong_password(client: TestClient) -> None:
+    auth.create_user("alice", "right")
+    r = client.post("/auth/login", json={"username": "alice", "password": "wrong"})
+    assert r.status_code == 401
+
+
+def test_auth_login_rejects_unknown_user(client: TestClient) -> None:
+    r = client.post("/auth/login", json={"username": "ghost", "password": "x"})
+    assert r.status_code == 401
+
+
+def test_auth_me_requires_bearer_token(client: TestClient) -> None:
+    r = client.get("/auth/me")
+    assert r.status_code == 401
+
+    auth.create_user("alice", "pw")
+    login = client.post(
+        "/auth/login", json={"username": "alice", "password": "pw"}
+    ).json()
+    token = login["access_token"]
+    r = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["username"] == "alice"
+
+
+def test_auth_me_rejects_invalid_token(client: TestClient) -> None:
+    r = client.get("/auth/me", headers={"Authorization": "Bearer garbage"})
+    assert r.status_code == 401
+
+
+def test_auth_gate_off_by_default(client: TestClient) -> None:
+    # When OSINT_AUTH_REQUIRED is unset, every route is public as before.
+    r = client.get("/watchlist")
+    assert r.status_code == 200
+
+
+def test_auth_gate_blocks_protected_when_required(
+    tmp_path: Path, monkeypatch
+) -> None:
+    # Stand up a second client with the gate forced on.
+    wl_db = tmp_path / "wl2.sqlite3"
+    monkeypatch.setattr(watchlist, "DEFAULT_DB_PATH", wl_db)
+    for fn in (watchlist.add, watchlist.remove, watchlist.list_all,
+              watchlist.mark_scanned, watchlist.get):
+        monkeypatch.setitem(fn.__kwdefaults__, "db_path", wl_db)
+
+    users_db = tmp_path / "users2.sqlite3"
+    monkeypatch.setattr(auth, "DEFAULT_DB_PATH", users_db)
+    for fn in (auth.create_user, auth.get_user, auth.list_users, auth.authenticate):
+        monkeypatch.setitem(fn.__kwdefaults__, "db_path", users_db)
+
+    monkeypatch.setenv("OSINT_AUTH_SECRET", "t2")
+    monkeypatch.setenv("OSINT_AUTH_REQUIRED", "1")
+
+    gated = TestClient(api.create_app())
+    # /health stays public even with the gate on.
+    assert gated.get("/health").status_code == 200
+    # /watchlist is not public → 401.
+    assert gated.get("/watchlist").status_code == 401
+
+    auth.create_user("alice", "pw")
+    token = gated.post(
+        "/auth/login", json={"username": "alice", "password": "pw"}
+    ).json()["access_token"]
+    r = gated.get("/watchlist", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 200
