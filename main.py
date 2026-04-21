@@ -259,6 +259,31 @@ def build_parser() -> argparse.ArgumentParser:
              "Exits after printing the shared-connections report.",
     )
     p.add_argument(
+        "--case-new", dest="case_new", type=str, default=None, metavar="NAME",
+        help="Create a new investigation case and exit",
+    )
+    p.add_argument(
+        "--case-list", dest="case_list", action="store_true",
+        help="List all investigation cases and exit",
+    )
+    p.add_argument(
+        "--case-show", dest="case_show", type=int, default=None, metavar="ID",
+        help="Show a case with its notes and bookmarks, then exit",
+    )
+    p.add_argument(
+        "--case-note", dest="case_note", type=str, default=None, metavar="ID:BODY",
+        help="Append a note to a case (format: '7:lead on suspect X')",
+    )
+    p.add_argument(
+        "--case-bookmark", dest="case_bookmark", type=str, default=None,
+        metavar="ID:TYPE:VALUE",
+        help="Add a bookmark to a case (e.g. '7:email:x@y.io')",
+    )
+    p.add_argument(
+        "--case-close", dest="case_close", type=int, default=None, metavar="ID",
+        help="Mark a case as closed and exit",
+    )
+    p.add_argument(
         "--watchlist-add", dest="watchlist_add", type=str, default=None,
         help="Add a username to the watchlist and exit",
     )
@@ -571,6 +596,123 @@ def _run_compare(spec: str) -> None:
                 )
 
 
+def _run_case_commands(args) -> bool:
+    """Dispatch --case-* flags. Returns True if a case command ran."""
+    from core import cases
+
+    if args.case_new:
+        try:
+            c = cases.create_case(args.case_new)
+        except ValueError as exc:
+            console.print(f"  [red]{exc}[/red]")
+            sys.exit(1)
+        console.print(
+            f"  [green]Created case #{c.id}[/green]: {c.name} ({c.status})"
+        )
+        return True
+
+    if args.case_list:
+        entries = cases.list_cases()
+        if not entries:
+            console.print("  [yellow]No cases yet. Use --case-new NAME.[/yellow]")
+            return True
+        console.print(f"\n  [bold]Cases[/bold] ({len(entries)})")
+        for c in entries:
+            console.print(
+                f"    [cyan]#{c.id:>3}[/cyan]  {c.status:<8}  "
+                f"{_fmt_ts(c.created_ts)}  {c.name}"
+            )
+        return True
+
+    if args.case_show is not None:
+        c = cases.get_case(args.case_show)
+        if c is None:
+            console.print(f"  [red]Case #{args.case_show} not found[/red]")
+            sys.exit(1)
+        console.print(
+            f"\n  [bold]Case #{c.id}[/bold]: {c.name} "
+            f"([yellow]{c.status}[/yellow])"
+        )
+        if c.description:
+            console.print(f"  {c.description}")
+        console.print(
+            f"  [dim]created {_fmt_ts(c.created_ts)}  updated {_fmt_ts(c.updated_ts)}[/dim]"
+        )
+        notes = cases.list_notes(c.id)
+        if notes:
+            console.print("\n  [bold]Notes[/bold]")
+            for n in notes:
+                console.print(f"    [cyan]#{n.id}[/cyan]  {_fmt_ts(n.created_ts)}")
+                console.print(f"      {n.body}")
+        bms = cases.list_bookmarks(c.id)
+        if bms:
+            console.print("\n  [bold]Bookmarks[/bold]")
+            for b in bms:
+                label = f" — {b.label}" if b.label else ""
+                console.print(
+                    f"    [cyan]#{b.id}[/cyan]  {b.target_type}:{b.target_value}{label}"
+                )
+        return True
+
+    if args.case_note:
+        spec = args.case_note
+        sep = spec.find(":")
+        if sep <= 0:
+            console.print(
+                "  [red]--case-note expects 'ID:BODY' (e.g. '7:lead on X')[/red]"
+            )
+            sys.exit(2)
+        try:
+            case_id = int(spec[:sep])
+        except ValueError:
+            console.print("  [red]--case-note: ID must be an integer[/red]")
+            sys.exit(2)
+        body = spec[sep + 1:]
+        try:
+            n = cases.add_note(case_id, body)
+        except ValueError as exc:
+            console.print(f"  [red]{exc}[/red]")
+            sys.exit(1)
+        console.print(f"  [green]Added note #{n.id}[/green] to case #{case_id}")
+        return True
+
+    if args.case_bookmark:
+        parts = args.case_bookmark.split(":", 2)
+        if len(parts) != 3:
+            console.print(
+                "  [red]--case-bookmark expects 'ID:TYPE:VALUE' "
+                "(e.g. '7:email:x@y.io')[/red]"
+            )
+            sys.exit(2)
+        try:
+            case_id = int(parts[0])
+        except ValueError:
+            console.print("  [red]--case-bookmark: ID must be an integer[/red]")
+            sys.exit(2)
+        try:
+            b = cases.add_bookmark(
+                case_id, target_type=parts[1], target_value=parts[2]
+            )
+        except ValueError as exc:
+            console.print(f"  [red]{exc}[/red]")
+            sys.exit(1)
+        console.print(
+            f"  [green]Added bookmark #{b.id}[/green]: "
+            f"{b.target_type}:{b.target_value}"
+        )
+        return True
+
+    if args.case_close is not None:
+        updated = cases.update_case(args.case_close, status="closed")
+        if updated is None:
+            console.print(f"  [red]Case #{args.case_close} not found[/red]")
+            sys.exit(1)
+        console.print(f"  [green]Closed case #{updated.id}[/green]: {updated.name}")
+        return True
+
+    return False
+
+
 def _run_social_graph(spec: str) -> None:
     """Handle --social-graph USER_A,USER_B: fetch GitHub neighbours + overlap."""
     parts = [p.strip() for p in spec.split(",") if p.strip()]
@@ -671,6 +813,9 @@ def main() -> None:
 
     if args.social_graph:
         _run_social_graph(args.social_graph)
+        return
+
+    if _run_case_commands(args):
         return
 
     if _handle_watchlist_commands(args):

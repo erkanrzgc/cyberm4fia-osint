@@ -11,7 +11,7 @@ pytest.importorskip("httpx")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from core import api, watchlist  # noqa: E402
+from core import api, cases, watchlist  # noqa: E402
 from core.api import server as api_server  # noqa: E402
 from core.models import PlatformResult, ScanResult  # noqa: E402
 
@@ -27,6 +27,18 @@ def client(tmp_path: Path, monkeypatch):
     for fn in (watchlist.add, watchlist.remove, watchlist.list_all,
               watchlist.mark_scanned, watchlist.get):
         monkeypatch.setitem(fn.__kwdefaults__, "db_path", wl_db)
+
+    # Same trick for the cases store — keep its sqlite file in tmp so the
+    # API tests can't pollute the user's real cases DB.
+    cases_db = tmp_path / "cases.sqlite3"
+    monkeypatch.setattr(cases, "DEFAULT_DB_PATH", cases_db)
+    for fn in (
+        cases.create_case, cases.get_case, cases.list_cases,
+        cases.update_case, cases.delete_case,
+        cases.add_note, cases.list_notes, cases.delete_note,
+        cases.add_bookmark, cases.list_bookmarks, cases.delete_bookmark,
+    ):
+        monkeypatch.setitem(fn.__kwdefaults__, "db_path", cases_db)
 
     async def fake_run_scan(cfg):
         r = ScanResult(username=cfg.username)
@@ -371,3 +383,98 @@ def test_graph_returns_cytoscape_payload(client: TestClient, monkeypatch) -> Non
         e["data"]["source"] == "mallory" and e["data"]["target"] == "platform::GitHub"
         for e in data["edges"]
     )
+
+
+def test_cases_create_and_list(client: TestClient) -> None:
+    r = client.post(
+        "/cases",
+        json={"name": "op-lighthouse", "description": "suspect X", "tags": ["urgent"]},
+    )
+    assert r.status_code == 200
+    assert r.json()["name"] == "op-lighthouse"
+
+    r = client.get("/cases")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["count"] == 1
+    assert data["entries"][0]["status"] == "open"
+
+
+def test_cases_create_rejects_duplicate(client: TestClient) -> None:
+    client.post("/cases", json={"name": "dupe", "description": ""})
+    r = client.post("/cases", json={"name": "dupe", "description": ""})
+    assert r.status_code == 400
+
+
+def test_cases_detail_includes_notes_and_bookmarks(client: TestClient) -> None:
+    r = client.post("/cases", json={"name": "op", "description": ""})
+    case_id = r.json()["id"]
+    client.post(f"/cases/{case_id}/notes", json={"body": "initial lead"})
+    client.post(
+        f"/cases/{case_id}/bookmarks",
+        json={"target_type": "email", "target_value": "x@y.io", "label": "primary"},
+    )
+    r = client.get(f"/cases/{case_id}")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["name"] == "op"
+    assert len(data["notes"]) == 1
+    assert data["notes"][0]["body"] == "initial lead"
+    assert len(data["bookmarks"]) == 1
+    assert data["bookmarks"][0]["target_value"] == "x@y.io"
+
+
+def test_cases_detail_404_when_missing(client: TestClient) -> None:
+    r = client.get("/cases/999")
+    assert r.status_code == 404
+
+
+def test_cases_update_status(client: TestClient) -> None:
+    case_id = client.post("/cases", json={"name": "op", "description": ""}).json()["id"]
+    r = client.patch(f"/cases/{case_id}", json={"status": "closed"})
+    assert r.status_code == 200
+    assert r.json()["status"] == "closed"
+
+
+def test_cases_update_rejects_bad_status(client: TestClient) -> None:
+    case_id = client.post("/cases", json={"name": "op", "description": ""}).json()["id"]
+    r = client.patch(f"/cases/{case_id}", json={"status": "pending"})
+    assert r.status_code == 400
+
+
+def test_cases_delete_cascades(client: TestClient) -> None:
+    case_id = client.post("/cases", json={"name": "op", "description": ""}).json()["id"]
+    client.post(f"/cases/{case_id}/notes", json={"body": "n"})
+    r = client.delete(f"/cases/{case_id}")
+    assert r.status_code == 200
+    r = client.get(f"/cases/{case_id}")
+    assert r.status_code == 404
+
+
+def test_cases_note_on_missing_case_404(client: TestClient) -> None:
+    r = client.post("/cases/999/notes", json={"body": "ghost"})
+    assert r.status_code == 404
+
+
+def test_cases_bookmark_rejects_bad_target_type(client: TestClient) -> None:
+    case_id = client.post("/cases", json={"name": "op", "description": ""}).json()["id"]
+    r = client.post(
+        f"/cases/{case_id}/bookmarks",
+        json={"target_type": "carrier-pigeon", "target_value": "x"},
+    )
+    assert r.status_code == 400
+
+
+def test_cases_delete_note_and_bookmark(client: TestClient) -> None:
+    case_id = client.post("/cases", json={"name": "op", "description": ""}).json()["id"]
+    note_id = client.post(
+        f"/cases/{case_id}/notes", json={"body": "n"}
+    ).json()["id"]
+    bm_id = client.post(
+        f"/cases/{case_id}/bookmarks",
+        json={"target_type": "url", "target_value": "https://x"},
+    ).json()["id"]
+    assert client.delete(f"/cases/notes/{note_id}").status_code == 200
+    assert client.delete(f"/cases/bookmarks/{bm_id}").status_code == 200
+    assert client.delete(f"/cases/notes/{note_id}").status_code == 404
+    assert client.delete(f"/cases/bookmarks/{bm_id}").status_code == 404

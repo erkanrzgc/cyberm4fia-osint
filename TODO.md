@@ -46,8 +46,14 @@
 - [x] --social-graph user_a,user_b CLI flag
 - [x] Web UI panel listing shared connections with clickable GitHub links
 
+## Sprint 16: Investigation Case Management  ✅
+- [x] core/cases.py — SQLite Case + CaseNote + CaseBookmark CRUD
+  (cascade delete via FK, status open/closed/archived)
+- [x] /cases, /cases/{id}, /cases/{id}/notes, /cases/{id}/bookmarks REST API
+- [x] --case-new/--case-list/--case-show/--case-note/--case-bookmark/--case-close CLI
+- [x] Web UI panel: case list + detail with inline note/bookmark forms
+
 ## Backlog (oncelik sirasiyla)
-- [ ] OSINT investigation/case yonetimi — bookmark, etiket, not sistemi
 - [ ] Multi-user auth (JWT) — REST API icin
 - [ ] Export: CSV, Excel formatlari
 - [ ] Proxy pool rotasyonu — birden fazla proxy round-robin

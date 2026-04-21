@@ -581,4 +581,244 @@ socialForm.addEventListener("submit", (ev) => {
   loadSocialGraph(a, b);
 });
 
+const caseCreateForm = document.getElementById("case-create-form");
+const caseStatus = document.getElementById("case-status");
+const caseListEl = document.getElementById("case-list");
+const caseDetail = document.getElementById("case-detail");
+let activeCaseId = null;
+
+function fmtTs(ts) {
+  if (!ts) return "";
+  const d = new Date(ts * 1000);
+  return d.toISOString().slice(0, 16).replace("T", " ");
+}
+
+async function refreshCases() {
+  try {
+    const res = await fetch("/cases");
+    if (!res.ok) return;
+    const data = await res.json();
+    caseListEl.innerHTML = "";
+    if (!data.entries || data.entries.length === 0) {
+      const li = document.createElement("li");
+      li.className = "empty";
+      li.style.cursor = "default";
+      li.textContent = "no cases yet — create one above";
+      caseListEl.appendChild(li);
+      return;
+    }
+    for (const c of data.entries) {
+      const li = document.createElement("li");
+      li.dataset.caseId = c.id;
+      if (c.id === activeCaseId) li.classList.add("active");
+      const name = document.createElement("span");
+      name.className = "case-name";
+      name.textContent = "#" + c.id + "  " + c.name;
+      const meta = document.createElement("span");
+      meta.className = "case-meta status-" + c.status;
+      meta.textContent = c.status + " · " + fmtTs(c.created_ts);
+      li.appendChild(name);
+      li.appendChild(meta);
+      li.addEventListener("click", () => loadCaseDetail(c.id));
+      caseListEl.appendChild(li);
+    }
+  } catch (err) {
+    caseStatus.textContent = "cases fetch error: " + err.message;
+  }
+}
+
+async function loadCaseDetail(caseId) {
+  activeCaseId = caseId;
+  await refreshCases();
+  try {
+    const res = await fetch("/cases/" + caseId);
+    if (!res.ok) {
+      caseDetail.textContent = "case not found";
+      caseDetail.classList.add("show");
+      return;
+    }
+    const c = await res.json();
+    caseDetail.innerHTML = "";
+    const title = document.createElement("h3");
+    title.textContent = "#" + c.id + "  " + c.name + "  (" + c.status + ")";
+    caseDetail.appendChild(title);
+    if (c.description) {
+      const d = document.createElement("div");
+      d.className = "description";
+      d.textContent = c.description;
+      caseDetail.appendChild(d);
+    }
+
+    const actions = document.createElement("div");
+    actions.className = "case-actions";
+    if (c.status !== "closed") {
+      const closeBtn = document.createElement("button");
+      closeBtn.type = "button";
+      closeBtn.textContent = "Close case";
+      closeBtn.addEventListener("click", async () => {
+        await fetch("/cases/" + caseId, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "closed" }),
+        });
+        loadCaseDetail(caseId);
+      });
+      actions.appendChild(closeBtn);
+    }
+    const delBtn = document.createElement("button");
+    delBtn.type = "button";
+    delBtn.textContent = "Delete";
+    delBtn.addEventListener("click", async () => {
+      if (!confirm("Delete case #" + caseId + "?")) return;
+      await fetch("/cases/" + caseId, { method: "DELETE" });
+      activeCaseId = null;
+      caseDetail.classList.remove("show");
+      refreshCases();
+    });
+    actions.appendChild(delBtn);
+    caseDetail.appendChild(actions);
+
+    // Notes
+    const notesH = document.createElement("h4");
+    notesH.textContent = "Notes (" + (c.notes || []).length + ")";
+    caseDetail.appendChild(notesH);
+    for (const n of c.notes || []) {
+      const row = document.createElement("div");
+      row.className = "detail-row";
+      const body = document.createElement("span");
+      body.style.flex = "1";
+      body.textContent = "[" + fmtTs(n.created_ts) + "] " + n.body;
+      const rm = document.createElement("button");
+      rm.type = "button";
+      rm.className = "remove";
+      rm.textContent = "×";
+      rm.addEventListener("click", async () => {
+        await fetch("/cases/notes/" + n.id, { method: "DELETE" });
+        loadCaseDetail(caseId);
+      });
+      row.appendChild(body);
+      row.appendChild(rm);
+      caseDetail.appendChild(row);
+    }
+    const noteForm = document.createElement("form");
+    noteForm.className = "inline-form";
+    const noteInput = document.createElement("input");
+    noteInput.placeholder = "add note…";
+    noteInput.required = true;
+    const noteBtn = document.createElement("button");
+    noteBtn.type = "submit";
+    noteBtn.textContent = "Add";
+    noteForm.appendChild(noteInput);
+    noteForm.appendChild(noteBtn);
+    noteForm.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const body = noteInput.value.trim();
+      if (!body) return;
+      await fetch("/cases/" + caseId + "/notes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body: body }),
+      });
+      noteInput.value = "";
+      loadCaseDetail(caseId);
+    });
+    caseDetail.appendChild(noteForm);
+
+    // Bookmarks
+    const bmsH = document.createElement("h4");
+    bmsH.textContent = "Bookmarks (" + (c.bookmarks || []).length + ")";
+    caseDetail.appendChild(bmsH);
+    for (const b of c.bookmarks || []) {
+      const row = document.createElement("div");
+      row.className = "detail-row";
+      const body = document.createElement("span");
+      body.style.flex = "1";
+      body.textContent = b.target_type + ": " + b.target_value +
+        (b.label ? " — " + b.label : "");
+      const rm = document.createElement("button");
+      rm.type = "button";
+      rm.className = "remove";
+      rm.textContent = "×";
+      rm.addEventListener("click", async () => {
+        await fetch("/cases/bookmarks/" + b.id, { method: "DELETE" });
+        loadCaseDetail(caseId);
+      });
+      row.appendChild(body);
+      row.appendChild(rm);
+      caseDetail.appendChild(row);
+    }
+    const bmForm = document.createElement("form");
+    bmForm.className = "inline-form";
+    const typeSel = document.createElement("select");
+    for (const t of ["scan", "platform", "email", "phone", "wallet", "url", "note"]) {
+      const opt = document.createElement("option");
+      opt.value = t;
+      opt.textContent = t;
+      typeSel.appendChild(opt);
+    }
+    const valInput = document.createElement("input");
+    valInput.placeholder = "target value";
+    valInput.required = true;
+    const labelInput = document.createElement("input");
+    labelInput.placeholder = "label (optional)";
+    const bmBtn = document.createElement("button");
+    bmBtn.type = "submit";
+    bmBtn.textContent = "Add";
+    bmForm.appendChild(typeSel);
+    bmForm.appendChild(valInput);
+    bmForm.appendChild(labelInput);
+    bmForm.appendChild(bmBtn);
+    bmForm.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const val = valInput.value.trim();
+      if (!val) return;
+      await fetch("/cases/" + caseId + "/bookmarks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          target_type: typeSel.value,
+          target_value: val,
+          label: labelInput.value.trim(),
+        }),
+      });
+      valInput.value = "";
+      labelInput.value = "";
+      loadCaseDetail(caseId);
+    });
+    caseDetail.appendChild(bmForm);
+    caseDetail.classList.add("show");
+  } catch (err) {
+    caseStatus.textContent = "case detail error: " + err.message;
+  }
+}
+
+caseCreateForm.addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const fd = new FormData(caseCreateForm);
+  const name = (fd.get("name") || "").toString().trim();
+  const description = (fd.get("description") || "").toString().trim();
+  if (!name) return;
+  caseStatus.textContent = "creating…";
+  try {
+    const res = await fetch("/cases", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: name, description: description, tags: [] }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      caseStatus.textContent = "error: " + (err.detail || res.status);
+      return;
+    }
+    caseStatus.textContent = "";
+    caseCreateForm.reset();
+    const c = await res.json();
+    refreshCases();
+    loadCaseDetail(c.id);
+  } catch (err) {
+    caseStatus.textContent = "network error: " + err.message;
+  }
+});
+
+refreshCases();
 refreshWatchlist();

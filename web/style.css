@@ -179,6 +179,75 @@ footer a { color: var(--accent); text-decoration: none; }
 .panel-correlate { grid-column: 1 / -1; }
 .panel-compare { grid-column: 1 / -1; }
 .panel-social { grid-column: 1 / -1; }
+.panel-cases { grid-column: 1 / -1; }
+
+#case-status { font-family: var(--mono); font-size: 0.82rem; color: var(--muted); margin-bottom: 0.5rem; }
+#case-list { list-style: none; padding: 0; margin: 0; }
+#case-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+#case-list li:last-child { border-bottom: none; }
+#case-list li:hover { background: var(--surface-hi); }
+#case-list li.active { background: var(--surface-hi); border-left: 3px solid var(--accent); padding-left: calc(0.75rem - 3px); }
+#case-list .status-open { color: #9ad0a5; }
+#case-list .status-closed { color: var(--muted); }
+#case-list .status-archived { color: #7d8590; }
+#case-list .case-name { flex: 1; }
+#case-list .case-meta { color: var(--muted); font-size: 0.75rem; }
+
+#case-detail {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  display: none;
+}
+#case-detail.show { display: block; }
+#case-detail h3 {
+  margin: 0 0 0.4rem;
+  font-size: 0.95rem;
+  color: var(--text);
+}
+#case-detail h4 {
+  margin: 1rem 0 0.4rem;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+#case-detail .description { color: var(--muted); margin-bottom: 0.5rem; }
+#case-detail .detail-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  padding: 0.3rem 0;
+  border-bottom: 1px dashed var(--border);
+}
+#case-detail .detail-row:last-child { border-bottom: none; }
+#case-detail .detail-row .remove {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 0.1rem 0.5rem;
+  font-size: 0.7rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+#case-detail .detail-row .remove:hover { color: var(--accent); border-color: var(--accent); }
+#case-detail form.inline-form { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+#case-detail form.inline-form input { flex: 1; font-size: 0.8rem; }
+#case-detail form.inline-form button { padding: 0.4rem 0.8rem; font-size: 0.8rem; }
+#case-detail .case-actions { margin-top: 0.75rem; display: flex; gap: 0.5rem; }
 
 #social-status { font-family: var(--mono); font-size: 0.82rem; color: var(--muted); margin-bottom: 0.5rem; }
 #social-summary {

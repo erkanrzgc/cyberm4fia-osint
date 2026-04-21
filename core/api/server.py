@@ -20,7 +20,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from core import watchlist
+from core import cases, watchlist
 from core.api.cytoscape import payload_to_cytoscape
 from core.compare import compare_payloads
 from core.config import ScanConfig
@@ -67,6 +67,31 @@ class WatchlistAddRequest(BaseModel):
     username: str = Field(..., min_length=1)
     tags: list[str] = Field(default_factory=list)
     notes: str = ""
+
+
+class CaseCreateRequest(BaseModel):
+    name: str = Field(..., min_length=1)
+    description: str = ""
+    tags: list[str] = Field(default_factory=list)
+
+
+class CaseUpdateRequest(BaseModel):
+    description: str | None = None
+    status: str | None = None
+    tags: list[str] | None = None
+
+
+class CaseNoteRequest(BaseModel):
+    body: str = Field(..., min_length=1)
+    author: str = ""
+
+
+class CaseBookmarkRequest(BaseModel):
+    target_type: str = Field(..., min_length=1)
+    target_value: str = Field(..., min_length=1)
+    label: str = ""
+    tags: list[str] = Field(default_factory=list)
+    scan_id: int | None = None
 
 
 def _cfg_from_request(req: ScanRequest) -> ScanConfig:
@@ -361,6 +386,95 @@ def build_app() -> FastAPI:
             "added": list(d.added),
             "removed": list(d.removed),
         }
+
+    @app.get("/cases")
+    def cases_list() -> dict[str, Any]:
+        entries = cases.list_cases()
+        return {
+            "count": len(entries),
+            "entries": [c.to_dict() for c in entries],
+        }
+
+    @app.post("/cases")
+    def cases_create(req: CaseCreateRequest) -> dict[str, Any]:
+        try:
+            c = cases.create_case(
+                req.name, description=req.description, tags=req.tags
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return c.to_dict()
+
+    @app.get("/cases/{case_id}")
+    def cases_detail(case_id: int) -> dict[str, Any]:
+        c = cases.get_case(case_id)
+        if c is None:
+            raise HTTPException(status_code=404, detail="case not found")
+        return {
+            **c.to_dict(),
+            "notes": [n.to_dict() for n in cases.list_notes(case_id)],
+            "bookmarks": [b.to_dict() for b in cases.list_bookmarks(case_id)],
+        }
+
+    @app.patch("/cases/{case_id}")
+    def cases_update(case_id: int, req: CaseUpdateRequest) -> dict[str, Any]:
+        try:
+            updated = cases.update_case(
+                case_id,
+                description=req.description,
+                status=req.status,
+                tags=req.tags,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if updated is None:
+            raise HTTPException(status_code=404, detail="case not found")
+        return updated.to_dict()
+
+    @app.delete("/cases/{case_id}")
+    def cases_delete(case_id: int) -> dict[str, Any]:
+        if not cases.delete_case(case_id):
+            raise HTTPException(status_code=404, detail="case not found")
+        return {"deleted": case_id}
+
+    @app.post("/cases/{case_id}/notes")
+    def cases_add_note(case_id: int, req: CaseNoteRequest) -> dict[str, Any]:
+        try:
+            note = cases.add_note(case_id, req.body, author=req.author)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        return note.to_dict()
+
+    @app.delete("/cases/notes/{note_id}")
+    def cases_delete_note(note_id: int) -> dict[str, Any]:
+        if not cases.delete_note(note_id):
+            raise HTTPException(status_code=404, detail="note not found")
+        return {"deleted": note_id}
+
+    @app.post("/cases/{case_id}/bookmarks")
+    def cases_add_bookmark(
+        case_id: int, req: CaseBookmarkRequest
+    ) -> dict[str, Any]:
+        try:
+            bm = cases.add_bookmark(
+                case_id,
+                target_type=req.target_type,
+                target_value=req.target_value,
+                label=req.label,
+                tags=req.tags,
+                scan_id=req.scan_id,
+            )
+        except ValueError as exc:
+            # Unknown target_type is a 400; missing case is a 404.
+            status = 404 if "does not exist" in str(exc) else 400
+            raise HTTPException(status_code=status, detail=str(exc)) from exc
+        return bm.to_dict()
+
+    @app.delete("/cases/bookmarks/{bookmark_id}")
+    def cases_delete_bookmark(bookmark_id: int) -> dict[str, Any]:
+        if not cases.delete_bookmark(bookmark_id):
+            raise HTTPException(status_code=404, detail="bookmark not found")
+        return {"deleted": bookmark_id}
 
     @app.get("/watchlist")
     def watchlist_list() -> dict[str, Any]:
