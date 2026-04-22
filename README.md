@@ -43,7 +43,7 @@ cyberm4fia <username>
 - **HTML + JSON + DOT graph** exports
 - **Tor / SOCKS / HTTP proxy** support
 - **MCP server** for Claude Desktop and other MCP-compatible clients
-- **CI-ready** — 212 tests, ~86% coverage, ruff + mypy clean
+- **CI-ready** — 500+ tests with ruff, mypy, bandit, and coverage checks
 
 ---
 
@@ -71,6 +71,8 @@ pip install -e '.[holehe]'    # 120+ site email registration probes
 pip install -e '.[ghunt]'     # Google account lookup (run `ghunt login` once after install)
 pip install -e '.[toutatis]'  # Instagram profile OSINT
 pip install -e '.[socks]'     # SOCKS / Tor support (aiohttp-socks)
+pip install -e '.[api]'       # FastAPI REST server + web UI
+pip install -e '.[report]'    # PDF/XLSX report exporters
 pip install -e '.[dev]'       # pytest, ruff, mypy, coverage
 ```
 
@@ -240,16 +242,24 @@ docker build -t cyberm4fia-osint .
 docker run --rm cyberm4fia-osint johndoe --quick
 ```
 
+The compose API service binds to `127.0.0.1:8000` by default. If you expose it
+outside localhost, enable the auth gate first:
+
+```bash
+docker compose run --rm cli --create-user analyst:change-me
+OSINT_AUTH_REQUIRED=1 OSINT_AUTH_SECRET="$(openssl rand -hex 32)" docker compose up api
+```
+
 ---
 
 ## Development
 
 ```bash
-pip install -e '.[dev]'
-pytest                              # 212 tests
+pip install -e '.[dev,api,report,socks,whois,photo,dns]'
+pytest
 pytest --cov=core --cov=modules     # coverage report
-ruff check .
-mypy core modules main.py
+ruff check main.py core modules utils tests
+mypy --ignore-missing-imports core modules utils
 ```
 
 GitHub Actions runs the full matrix on every push.
@@ -271,5 +281,4 @@ This tool queries **public** profile endpoints — the same information anyone c
 
 ## License
 
-This project is licensed under the MIT License. See the LICENSE file for more details. Check --> [LICENSE](LICENSE).
-
+MIT — see [LICENSE](LICENSE).

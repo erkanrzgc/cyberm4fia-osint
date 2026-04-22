@@ -2,18 +2,55 @@
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 
 import pytest
 
-pytest.importorskip("fastapi")
+fastapi_mod = pytest.importorskip("fastapi")
 pytest.importorskip("httpx")
 
-from fastapi.testclient import TestClient  # noqa: E402
+import httpx  # noqa: E402
 
 from core import api, auth, cases, watchlist  # noqa: E402
 from core.api import server as api_server  # noqa: E402
 from core.models import PlatformResult, ScanResult  # noqa: E402
+
+if Path(fastapi_mod.__file__).as_posix().startswith("/usr/lib/python3/dist-packages/"):
+    pytest.skip(
+        "system FastAPI/Starlette package hangs with local httpx ASGI transport",
+        allow_module_level=True,
+    )
+
+
+class ASGITestClient:
+    def __init__(self, app):
+        self.app = app
+
+    def request(self, method: str, url: str, **kwargs) -> httpx.Response:
+        async def _send() -> httpx.Response:
+            transport = httpx.ASGITransport(app=self.app)
+            async with httpx.AsyncClient(
+                transport=transport, base_url="http://test"
+            ) as ac:
+                return await ac.request(method, url, **kwargs)
+
+        return asyncio.run(_send())
+
+    def get(self, url: str, **kwargs) -> httpx.Response:
+        return self.request("GET", url, **kwargs)
+
+    def post(self, url: str, **kwargs) -> httpx.Response:
+        return self.request("POST", url, **kwargs)
+
+    def patch(self, url: str, **kwargs) -> httpx.Response:
+        return self.request("PATCH", url, **kwargs)
+
+    def delete(self, url: str, **kwargs) -> httpx.Response:
+        return self.request("DELETE", url, **kwargs)
+
+
+TestClient = ASGITestClient
 
 
 @pytest.fixture
@@ -148,7 +185,8 @@ def test_search_endpoint_rejects_empty_query(client: TestClient) -> None:
 def test_search_endpoint_returns_hits(
     client: TestClient, tmp_path: Path, monkeypatch
 ) -> None:
-    from core import history, search as search_mod
+    from core import history
+    from core import search as search_mod
     hist_db = tmp_path / "history.sqlite3"
     monkeypatch.setattr(history, "DEFAULT_DB_PATH", hist_db)
     monkeypatch.setattr(search_mod, "DEFAULT_DB_PATH", hist_db)
@@ -180,15 +218,18 @@ def test_search_endpoint_returns_hits(
     assert data["hits"][0]["username"] == "alice"
 
 
-def test_scan_stream_emits_events(client: TestClient) -> None:
-    with client.stream(
+@pytest.mark.asyncio
+async def test_scan_stream_emits_events(client: TestClient) -> None:
+    transport = httpx.ASGITransport(app=client.app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac, ac.stream(
         "POST",
         "/scan/stream",
         json={"username": "eve", "save_history": False},
     ) as r:
         assert r.status_code == 200
         assert r.headers["content-type"].startswith("text/event-stream")
-        body = b"".join(r.iter_bytes())
+        chunks = [chunk async for chunk in r.aiter_bytes()]
+        body = b"".join(chunks)
     text = body.decode()
     # At least the terminal result event must arrive.
     assert "\"kind\": \"result\"" in text

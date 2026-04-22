@@ -24,7 +24,7 @@ import sqlite3
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 DEFAULT_DB_PATH = Path.home() / ".local" / "share" / "cyberm4fia" / "users.sqlite3"
 
@@ -273,7 +273,7 @@ def decode_token(token: str, *, secret: str) -> dict[str, Any]:
     exp = payload.get("exp")
     if isinstance(exp, (int, float)) and exp < time.time():
         raise AuthError("token expired")
-    return payload
+    return cast(dict[str, Any], payload)
 
 
 # ── helpers for the API layer ──────────────────────────────────────

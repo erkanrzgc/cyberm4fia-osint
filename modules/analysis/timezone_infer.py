@@ -109,10 +109,10 @@ def infer_timezones(
 
     # Language — weak tiebreak only
     for lang in languages[:2]:
-        tz = _LANG_TZ_HINT.get(lang.code)
-        if tz:
-            scores[tz] += 0.15 * lang.confidence
-            reasons[tz].append(f"lang:{lang.code}")
+        lang_tz = _LANG_TZ_HINT.get(lang.code)
+        if lang_tz:
+            scores[lang_tz] += 0.15 * lang.confidence
+            reasons[lang_tz].append(f"lang:{lang.code}")
 
     if not scores:
         return []

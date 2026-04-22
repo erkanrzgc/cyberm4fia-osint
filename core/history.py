@@ -71,6 +71,9 @@ def save_scan(payload: dict, *, ts: int, db_path: Path = DEFAULT_DB_PATH) -> int
         )
         conn.commit()
         return int(cur.lastrowid or -1)
+    except sqlite3.Error as exc:
+        log.warning("history: could not save scan to %s: %s", db_path, exc)
+        return -1
     finally:
         conn.close()
 

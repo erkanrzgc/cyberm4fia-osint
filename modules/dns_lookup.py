@@ -19,14 +19,12 @@ async def get_dns_records(domain: str) -> dict:
 
     record_types = ["A", "AAAA", "MX", "NS", "TXT", "CNAME"]
     results: dict[str, list[str]] = {}
-    loop = asyncio.get_event_loop()
-
     for rtype in record_types:
         def _resolve(r: str = rtype) -> list[str]:
             return [str(a) for a in dns.resolver.resolve(domain, r, lifetime=5)]
 
         try:
-            results[rtype] = await loop.run_in_executor(None, _resolve)
+            results[rtype] = _resolve()
         except Exception as exc:  # dnspython exposes many specific errors
             log.debug("dns %s %s: %s", rtype, domain, exc)
             continue

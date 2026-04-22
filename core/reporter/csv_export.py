@@ -12,8 +12,9 @@ from __future__ import annotations
 import csv
 import io
 import zipfile
+from collections.abc import Iterable
 from datetime import datetime, timezone
-from typing import Any, Iterable
+from typing import Any
 
 from core.models import ScanResult
 from core.reporter.console_ui import console
@@ -150,7 +151,7 @@ def _geo_rows(result: ScanResult) -> list[list[Any]]:
 
 
 def _collect_sections(result: ScanResult) -> list[Section]:
-    summary_rows = [
+    summary_rows: list[list[Any]] = [
         ["username", result.username],
         ["scan_time_s", round(result.scan_time, 2)],
         ["total_checked", result.total_checked],
@@ -229,7 +230,9 @@ def export_xlsx(result: ScanResult, filepath: str) -> None:
             "XLSX export requires 'openpyxl'. Install it with: pip install openpyxl"
         )
     wb = Workbook()
-    wb.remove(wb.active)  # Drop the default blank sheet.
+    active = wb.active
+    if active is not None:
+        wb.remove(active)  # type: ignore[arg-type]  # Drop the default blank sheet.
     for name, header, rows in _collect_sections(result):
         ws = wb.create_sheet(title=name[:31])  # Excel caps sheet names at 31.
         ws.append(header)

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from dataclasses import replace
 from pathlib import Path
 
 from core.config import ScanConfig
@@ -26,23 +27,26 @@ from core.smart_search import (
 from modules.breach_check import breach_check_available, check_many_emails, hibp_available
 from modules.comb_leaks import search_comb_many
 from modules.deep_scrapers import DEEP_SCRAPERS
+from modules.dns_lookup import enumerate_subdomains, get_dns_records
+from modules.email_discovery import discover_emails
+from modules.fp_filter import score_match
 from modules.ghunt_lookup import is_available as ghunt_available
 from modules.ghunt_lookup import lookup_emails as ghunt_lookup_emails
 from modules.holehe_check import check_emails as holehe_check_emails
 from modules.holehe_check import is_available as holehe_available
 from modules.holehe_check import module_count as holehe_module_count
-from modules.toutatis_lookup import is_available as toutatis_available
-from modules.toutatis_lookup import lookup_usernames as toutatis_lookup_usernames
-from modules.dns_lookup import enumerate_subdomains, get_dns_records
-from modules.email_discovery import discover_emails
-from modules.fp_filter import score_match
 from modules.photo_compare import compare_profile_photos
 from modules.platforms import PLATFORMS, Platform
-from modules.profile_extract import extract_profile, is_available as _extract_available
+from modules.profile_extract import extract_profile
+from modules.profile_extract import is_available as _extract_available
 from modules.stealth.playwright_fallback import (
     AVAILABLE as PLAYWRIGHT_AVAILABLE,
+)
+from modules.stealth.playwright_fallback import (
     fetch_rendered,
 )
+from modules.toutatis_lookup import is_available as toutatis_available
+from modules.toutatis_lookup import lookup_usernames as toutatis_lookup_usernames
 from modules.web_presence import discover_web_presence
 from modules.whois_lookup import check_username_domains
 
@@ -316,7 +320,7 @@ async def _phase_smart_search(
         return
 
     var_tasks = [
-        _check_platform(client, var, p)
+        _check_platform(client, replace(cfg, username=var), p)
         for var in check_variations
         for p in check_platforms
     ]
@@ -599,7 +603,8 @@ async def _phase_recursive(
             f"{cfg.recursive_depth}: probing {len(pass_queue)} pivoted username(s)"
         )
         for candidate in pass_queue:
-            tasks = [_check_platform(client, candidate, p) for p in platforms]
+            candidate_cfg = replace(cfg, username=candidate)
+            tasks = [_check_platform(client, candidate_cfg, p) for p in platforms]
             new_results = await asyncio.gather(*tasks)
             for r in new_results:
                 if (

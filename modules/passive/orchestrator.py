@@ -36,12 +36,18 @@ from modules.passive.models import PassiveHit
 log = get_logger(__name__)
 
 
+def _wayback_url_factory(
+    client: HTTPClient, url: str
+) -> Callable[[], Awaitable[list[PassiveHit]]]:
+    return lambda: wayback.snapshots_for_url(client, url)
+
+
 async def _safe(
     name: str, coro: Awaitable[list[PassiveHit]]
 ) -> list[PassiveHit]:
     try:
         return await coro
-    except Exception as exc:  # noqa: BLE001 - passive intel is best-effort
+    except Exception as exc:
         log.debug("passive source %s failed: %s", name, exc)
         return []
 
@@ -87,7 +93,7 @@ async def run_passive(
         tasks.append(("ahmia", lambda: ahmia.search(client, username)))
 
     for url in profile_urls or []:
-        tasks.append((f"wayback-{url}", lambda u=url: wayback.snapshots_for_url(client, u)))
+        tasks.append((f"wayback-{url}", _wayback_url_factory(client, url)))
 
     if not tasks:
         return []

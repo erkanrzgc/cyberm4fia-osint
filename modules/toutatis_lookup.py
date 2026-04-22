@@ -77,10 +77,7 @@ def _lookup_blocking(username: str) -> ToutatisResult | None:
         return None
     session = _session_id()
     try:
-        if session:
-            data = _get_info(username, session)
-        else:
-            data = _advanced_lookup(username)
+        data = _get_info(username, session) if session else _advanced_lookup(username)
     except Exception as exc:
         log.debug("toutatis raised for %s: %s", username, exc)
         return None
@@ -95,10 +92,10 @@ def _lookup_blocking(username: str) -> ToutatisResult | None:
 
 
 async def lookup_username(username: str) -> ToutatisResult | None:
-    """Async wrapper that runs the blocking upstream call in a thread."""
+    """Async wrapper around the blocking upstream call."""
     if not _AVAILABLE or not username:
         return None
-    return await asyncio.to_thread(_lookup_blocking, username)
+    return _lookup_blocking(username)
 
 
 async def lookup_usernames(usernames: list[str]) -> dict[str, ToutatisResult]:

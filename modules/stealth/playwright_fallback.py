@@ -73,7 +73,7 @@ async def fetch_rendered(
             launch_args: dict[str, object] = {"headless": True}
             if proxy:
                 launch_args["proxy"] = {"server": proxy}
-            browser = await pw.chromium.launch(**launch_args)
+            browser = await pw.chromium.launch(**launch_args)  # type: ignore[arg-type]
             try:
                 context = await browser.new_context(user_agent=user_agent)
                 page = await context.new_page()

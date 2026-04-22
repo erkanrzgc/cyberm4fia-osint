@@ -14,9 +14,9 @@ or passed in fresh.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Any, Iterable
-
+from typing import Any
 
 # ── field pickers ─────────────────────────────────────────────────────
 #
@@ -51,8 +51,12 @@ def _crypto_key(c: dict) -> str:
 def _geo_key(g: dict) -> str:
     # Round to 4 decimals so tiny Nominatim wobble doesn't register as a move.
     try:
-        lat = round(float(g.get("lat")), 4)
-        lng = round(float(g.get("lng")), 4)
+        lat_raw = g.get("lat")
+        lng_raw = g.get("lng")
+        if lat_raw is None or lng_raw is None:
+            raise TypeError
+        lat = round(float(lat_raw), 4)
+        lng = round(float(lng_raw), 4)
     except (TypeError, ValueError):
         return (g.get("display") or g.get("query") or "").strip().lower()
     return f"{lat},{lng}"

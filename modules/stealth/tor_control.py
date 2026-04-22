@@ -11,7 +11,7 @@ Usage::
     if AVAILABLE:
         await rotate_circuit(control_port=9051, password="hunter2")
 
-Everything runs in a thread executor because ``stem`` is sync-only.
+The ``stem`` call is sync-only and is kept best-effort.
 """
 
 from __future__ import annotations
@@ -58,10 +58,10 @@ async def rotate_circuit(
         log.debug("stem not available; skipping Tor circuit rotation")
         return False
     try:
-        await asyncio.to_thread(_sync_newnym, host, control_port, password)
+        _sync_newnym(host, control_port, password)
         log.info("Tor circuit rotated (NEWNYM sent to %s:%d)", host, control_port)
         return True
-    except Exception as exc:  # noqa: BLE001 - best-effort
+    except Exception as exc:
         log.warning("Tor circuit rotation failed: %s", exc)
         return False
 

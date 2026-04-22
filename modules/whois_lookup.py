@@ -16,9 +16,8 @@ async def lookup_domain(domain: str) -> dict | None:
         log.debug("python-whois not installed; skipping %s", domain)
         return None
 
-    loop = asyncio.get_event_loop()
     try:
-        result = await loop.run_in_executor(None, whois.whois, domain)
+        result = whois.whois(domain)
     except Exception as exc:  # python-whois surfaces many distinct types
         log.debug("whois lookup failed for %s: %s", domain, exc)
         return None

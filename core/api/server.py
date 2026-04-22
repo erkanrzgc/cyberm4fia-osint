@@ -9,15 +9,15 @@ and the API is a supplementary surface.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import time
+from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import Any, AsyncIterator
+from typing import Any
 
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from core import auth, cases, watchlist
@@ -27,15 +27,40 @@ from core.config import ScanConfig
 from core.correlation import correlate
 from core.engine import run_scan
 from core.history import diff_entries, get_latest, get_scan, list_scans, save_scan
-from core.search import index_scan, search as history_search
 from core.http_client import HTTPClient
 from core.logging_setup import get_logger
 from core.progress import ProgressEmitter, set_emitter
+from core.search import index_scan
+from core.search import search as history_search
 from core.social_graph import compute_overlap, fetch_github_neighbors
 
 log = get_logger(__name__)
 
 _WEB_DIR = Path(__file__).resolve().parent.parent.parent / "web"
+
+_PUBLIC_PATHS = frozenset({"/", "/health", "/auth/login", "/docs",
+                           "/openapi.json", "/redoc"})
+
+
+def _auth_dependency(request: Request) -> None:
+    path = request.url.path
+    if (
+        path in _PUBLIC_PATHS
+        or path.startswith("/static/")
+        or request.method == "OPTIONS"
+    ):
+        return
+
+    header = request.headers.get("authorization", "")
+    if not header.lower().startswith("bearer "):
+        raise HTTPException(status_code=401, detail="missing bearer token")
+
+    token = header.split(" ", 1)[1].strip()
+    try:
+        payload = auth.decode_token(token, secret=auth.get_secret())
+    except auth.AuthError as exc:
+        raise HTTPException(status_code=401, detail=f"invalid token: {exc}") from exc
+    request.state.user = payload
 
 
 # ── Request/response schemas ─────────────────────────────────────────
@@ -128,47 +153,13 @@ def _cfg_from_request(req: ScanRequest) -> ScanConfig:
 
 
 def build_app() -> FastAPI:
+    dependencies = [Depends(_auth_dependency)] if auth.is_auth_required() else None
     app = FastAPI(
         title="cyberm4fia-osint API",
         version="0.3.0",
         description="REST surface around the OSINT scan engine.",
+        dependencies=dependencies,
     )
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-
-    # Routes that remain public even when OSINT_AUTH_REQUIRED is set.
-    _PUBLIC_PATHS = frozenset({"/", "/health", "/auth/login", "/docs",
-                               "/openapi.json", "/redoc"})
-
-    @app.middleware("http")
-    async def _auth_gate(request: Request, call_next):
-        if not auth.is_auth_required():
-            return await call_next(request)
-        path = request.url.path
-        if (
-            path in _PUBLIC_PATHS
-            or path.startswith("/static/")
-            or request.method == "OPTIONS"
-        ):
-            return await call_next(request)
-        header = request.headers.get("authorization", "")
-        if not header.lower().startswith("bearer "):
-            return JSONResponse(
-                {"detail": "missing bearer token"}, status_code=401
-            )
-        token = header.split(" ", 1)[1].strip()
-        try:
-            payload = auth.decode_token(token, secret=auth.get_secret())
-        except auth.AuthError as exc:
-            return JSONResponse(
-                {"detail": f"invalid token: {exc}"}, status_code=401
-            )
-        request.state.user = payload
-        return await call_next(request)
 
     @app.get("/health")
     def health() -> dict[str, Any]:
@@ -221,11 +212,11 @@ def build_app() -> FastAPI:
         cfg = _cfg_from_request(req)
         try:
             result = await run_scan(cfg)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.exception("scan failed for %s", req.username)
             raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-        payload = result.to_dict()
+        payload: dict[str, Any] = result.to_dict()
         if req.save_history:
             try:
                 scan_id = save_scan(payload, ts=int(time.time()))
@@ -239,38 +230,45 @@ def build_app() -> FastAPI:
     @app.post("/scan/stream")
     async def scan_stream(req: ScanRequest) -> StreamingResponse:
         cfg = _cfg_from_request(req)
-        emitter = ProgressEmitter()
-        queue = emitter.subscribe()
-
-        async def _runner() -> None:
-            set_emitter(emitter)
-            try:
-                try:
-                    result = await run_scan(cfg)
-                except Exception as exc:  # noqa: BLE001
-                    log.exception("streamed scan failed for %s", req.username)
-                    emitter.emit_error(str(exc))
-                    return
-                payload = result.to_dict()
-                if req.save_history:
-                    try:
-                        scan_id = save_scan(payload, ts=int(time.time()))
-                    except (OSError, ValueError) as exc:
-                        log.warning("history: save failed: %s", exc)
-                    else:
-                        if scan_id > 0:
-                            index_scan(scan_id, payload)
-                emitter.emit_result(payload)
-            finally:
-                set_emitter(None)
-                emitter.close()
-
-        task = asyncio.create_task(_runner())
 
         async def _stream() -> AsyncIterator[bytes]:
+            emitter = ProgressEmitter()
+            queue = emitter.subscribe()
+
+            async def _runner() -> None:
+                set_emitter(emitter)
+                try:
+                    try:
+                        result = await run_scan(cfg)
+                    except Exception as exc:
+                        log.exception("streamed scan failed for %s", req.username)
+                        emitter.emit_error(str(exc))
+                        return
+                    payload: dict[str, Any] = result.to_dict()
+                    if req.save_history:
+                        try:
+                            scan_id = save_scan(payload, ts=int(time.time()))
+                        except (OSError, ValueError) as exc:
+                            log.warning("history: save failed: %s", exc)
+                        else:
+                            if scan_id > 0:
+                                index_scan(scan_id, payload)
+                    emitter.emit_result(payload)
+                finally:
+                    set_emitter(None)
+                    emitter.close()
+
+            task = asyncio.create_task(_runner())
             try:
                 while True:
-                    event = await queue.get()
+                    if task.done() and queue.empty():
+                        break
+                    try:
+                        event = await asyncio.wait_for(queue.get(), timeout=0.5)
+                    except asyncio.TimeoutError:
+                        if task.done():
+                            break
+                        continue
                     if event is None:
                         break
                     yield f"data: {json.dumps(event.to_dict())}\n\n".encode()
@@ -280,6 +278,9 @@ def build_app() -> FastAPI:
             finally:
                 if not task.done():
                     task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await task
+                emitter.unsubscribe(queue)
 
         return StreamingResponse(_stream(), media_type="text/event-stream")
 
@@ -602,14 +603,20 @@ def build_app() -> FastAPI:
 
     # ── Static Web UI ────────────────────────────────────────────
     if _WEB_DIR.exists():
-        app.mount("/static", StaticFiles(directory=str(_WEB_DIR)), name="static")
-
         @app.get("/", response_model=None)
         def index():
             index_path = _WEB_DIR / "index.html"
             if index_path.exists():
                 return FileResponse(str(index_path))
             return JSONResponse({"message": "cyberm4fia-osint API", "docs": "/docs"})
+
+        @app.get("/static/{asset_path:path}", response_model=None)
+        def static_asset(asset_path: str):
+            web_root = _WEB_DIR.resolve()
+            target = (web_root / asset_path).resolve()
+            if web_root not in target.parents or not target.is_file():
+                raise HTTPException(status_code=404, detail="static asset not found")
+            return FileResponse(str(target))
     else:
         @app.get("/")
         def index_fallback() -> dict[str, Any]:

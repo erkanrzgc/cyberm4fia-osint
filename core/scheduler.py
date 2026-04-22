@@ -67,7 +67,7 @@ async def _scan_one(
             ),
             notifiers,
         )
-        return 0, 0
+        return 0, False
 
     payload = result.to_dict()
     now = int(time.time())
@@ -99,13 +99,13 @@ async def _scan_one(
         notifiers,
     )
 
-    diffs_found = 0
+    diffs_found = False
     if previous is not None:
         current = history.get_latest(username, db_path=hist_db)
         if current is not None:
             d = diff_entries(previous, current)
             if d.added or d.removed:
-                diffs_found = 1
+                diffs_found = True
                 await notify_all(
                     Notification(
                         kind="scan_diff",

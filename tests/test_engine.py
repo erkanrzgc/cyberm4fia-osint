@@ -9,6 +9,7 @@ from core.config import ScanConfig
 from core.engine import (
     _extract_avatar_urls,
     _phase_recursive,
+    _phase_smart_search,
     _select_platforms,
     _status_from_http,
     run_scan,
@@ -183,6 +184,54 @@ async def test_run_scan_email_without_hibp_skips_breach(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_phase_smart_search_checks_variations_with_scan_config(monkeypatch):
+    cfg = ScanConfig(username="alice1", smart=True, fp_threshold=0.0)
+    platforms = [
+        Platform(
+            name="GitHub",
+            url="https://fake.test/{username}",
+            category="dev",
+            check_type="status",
+        ),
+    ]
+    platform_results = [
+        PlatformResult(
+            platform="GitHub",
+            url="https://fake.test/alice1",
+            category="dev",
+            exists=False,
+        ),
+    ]
+    result = ScanResult(username="alice_1")
+
+    checked: list[str] = []
+
+    async def fake_check_platform(client, cfg_arg, platform):
+        checked.append(cfg_arg.username)
+        return PlatformResult(
+            platform=platform.name,
+            url=platform.url.replace("{username}", cfg_arg.username),
+            category=platform.category,
+            exists=cfg_arg.username == "alice",
+            confidence=1.0,
+            status="found",
+        )
+
+    monkeypatch.setattr(engine_mod, "_check_platform", fake_check_platform)
+
+    await _phase_smart_search(
+        client=None,
+        cfg=cfg,
+        platforms=platforms,
+        platform_results=platform_results,
+        result=result,
+    )
+
+    assert "alice" in checked
+    assert any(r.status == "found (variation)" for r in result.platforms)
+
+
+@pytest.mark.asyncio
 async def test_phase_recursive_pivots_on_discovered_username(monkeypatch):
     """The recursive phase should pick up usernames from profile_data and
     discovered_usernames, re-run the platform sweep, and tag hits with the
@@ -202,11 +251,11 @@ async def test_phase_recursive_pivots_on_discovered_username(monkeypatch):
 
     calls: list[str] = []
 
-    async def fake_check_platform(client, username, platform):
-        calls.append(username)
+    async def fake_check_platform(client, cfg_arg, platform):
+        calls.append(cfg_arg.username)
         return PlatformResult(
             platform=platform.name,
-            url=platform.url.replace("{username}", username),
+            url=platform.url.replace("{username}", cfg_arg.username),
             category=platform.category,
             exists=True,
             confidence=1.0,

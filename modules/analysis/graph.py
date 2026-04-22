@@ -17,7 +17,7 @@ the reporter can dump it to JSON or feed it to a visualiser.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import networkx as nx
 
@@ -110,6 +110,6 @@ def build_entity_graph(result: Any) -> nx.DiGraph:
     return g
 
 
-def graph_to_dict(g: nx.DiGraph) -> dict:
+def graph_to_dict(g: nx.DiGraph) -> dict[str, Any]:
     """Serialize the graph to a JSON-safe node-link dict."""
-    return nx.node_link_data(g)
+    return cast(dict[str, Any], nx.node_link_data(g))

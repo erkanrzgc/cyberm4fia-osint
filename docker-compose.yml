@@ -15,7 +15,7 @@ services:
     container_name: cyberm4fia-api
     command: ["--serve", "--host", "0.0.0.0", "--port", "8000"]
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     volumes:
       - cyberm4fia-data:/home/osint/.local/share/cyberm4fia
       - ./reports:/data
@@ -24,6 +24,8 @@ services:
       - CYBERM4FIA_TELEGRAM_CHAT_ID
       - CYBERM4FIA_WEBHOOK_URL
       - CYBERM4FIA_WEBHOOK_SECRET
+      - OSINT_AUTH_REQUIRED
+      - OSINT_AUTH_SECRET
       - HIBP_API_KEY
     restart: unless-stopped
 
