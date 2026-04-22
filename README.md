@@ -1,24 +1,33 @@
-# cyberm4fia Open Source Intelligence
+<h1 align="center">cyberm4fia-osint</h1>
 
-```
+<p align="center">
+  <img src="https://img.shields.io/badge/mission-open%20source%20intelligence-blueviolet?style=for-the-badge" alt="mission">
+</p>
+
+<table align="center"><tr><td valign="middle">
+<pre>
  ██████╗██╗   ██╗██████╗ ███████╗██████╗ ███╗   ███╗██╗  ██╗███████╗██╗ █████╗
 ██╔════╝╚██╗ ██╔╝██╔══██╗██╔════╝██╔══██╗████╗ ████║██║  ██║██╔════╝██║██╔══██╗
 ██║      ╚████╔╝ ██████╔╝█████╗  ██████╔╝██╔████╔██║███████║█████╗  ██║███████║
 ██║       ╚██╔╝  ██╔══██╗██╔══╝  ██╔══██╗██║╚██╔╝██║╚════██║██╔══╝  ██║██╔══██║
 ╚██████╗   ██║   ██████╔╝███████╗██║  ██║██║ ╚═╝ ██║     ██║██║     ██║██║  ██║
  ╚═════╝   ╚═╝   ╚═════╝ ╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝     ╚═╝╚═╝     ╚═╝╚═╝  ╚═╝
-                    Open Source Intelligence by cyberm4fia
-```
+</pre>
+</td><td valign="middle">
+<img src="https://raw.githubusercontent.com/erkanrzgc/cyberm4fia-osint/main/resources/osint_icon.png" width="150">
+</td></tr></table>
 
-A terminal-first OSINT username reconnaissance framework. `cyberm4fia-osint` hunts a single username across **1,900+ platforms** — social, dating, dev, gaming, professional, community forums, and more — then enriches the findings with deep profile scraping, cross-referencing, breach checks, WHOIS, DNS, subdomain enumeration, recursive pivot discovery, and an optional **local LLM analyst** that writes a cybersecurity-aware report on the target.
+<p align="center">
+  <img src="https://img.shields.io/badge/python-3.10+-blue?style=flat-square&logo=python" alt="python">
+  <img src="https://img.shields.io/badge/platforms-1900+-purple?style=flat-square" alt="platforms">
+  <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="license">
+  <img src="https://img.shields.io/badge/AI-local%20LLM-orange?style=flat-square" alt="AI">
+  <img src="https://img.shields.io/github/last-commit/erkanrzgc/cyberm4fia-osint?style=flat-square" alt="last commit">
+</p>
 
-Every check, profile parser, and email-side enrichment is implemented natively in Python — no subprocess wrappers, no external CLIs to install.
-
-No parameters. No tuning. Just:
-
-```bash
-cyberm4fia <username>
-```
+<p align="center">
+  <b>cyberm4fia-osint</b> is a terminal-first OSINT username reconnaissance framework that hunts a single username across <b>1,900+ platforms</b> — then enriches findings with deep profile scraping, breach checks, cross-referencing, and optional <b>local LLM analysis</b>.
+</p>
 
 ---
 
