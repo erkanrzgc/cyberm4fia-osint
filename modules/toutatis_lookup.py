@@ -27,6 +27,8 @@ try:  # pragma: no cover - import guard
     _AVAILABLE = True
 except Exception as exc:  # pragma: no cover - import guard
     log.debug("toutatis unavailable: %s", exc)
+    _advanced_lookup = None  # type: ignore[assignment]
+    _get_info = None  # type: ignore[assignment]
     _AVAILABLE = False
 
 

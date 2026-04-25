@@ -292,3 +292,80 @@ async def test_phase_recursive_disabled_is_noop(monkeypatch):
     await _phase_recursive(client=None, cfg=cfg, platforms=[], result=result)
 
     assert called is False
+
+
+@pytest.mark.asyncio
+async def test_phase_recon_noop_without_domain():
+    from core.engine import _phase_recon
+
+    cfg = ScanConfig(username="u")  # redteam_domain=None
+    result = ScanResult(username="u")
+    await _phase_recon(client=None, cfg=cfg, result=result)
+    assert result.email_candidates == []
+    assert result.github_committers == []
+    assert result.recon_subdomains == []
+
+
+@pytest.mark.asyncio
+async def test_phase_recon_populates_all_three_slots(monkeypatch, tmp_path):
+    from core.engine import _phase_recon
+    from modules.recon.models import (
+        EmailCandidate,
+        GithubCommitter,
+        ReconSubdomain,
+    )
+
+    names_path = tmp_path / "names.txt"
+    names_path.write_text("Ada Byron\n")
+
+    async def fake_enum(_client, _domain):
+        return ["api.acme.com"]
+
+    async def fake_scan_org(_client, _org, *, max_repos=30, commits_per_repo=30):
+        return [GithubCommitter(email="ada@acme.com", name="Ada", repo="acme/x")]
+
+    async def fake_enrich(_client, _domain, *, existing=None):
+        hosts = list(existing or []) + ["vpn.acme.com"]
+        return [ReconSubdomain(host=h, source="dns_lookup") for h in hosts]
+
+    import modules.dns_lookup as dns_lookup
+    from modules.recon import email_patterns, github_org, subdomains_extra
+
+    monkeypatch.setattr(dns_lookup, "enumerate_subdomains", fake_enum)
+    monkeypatch.setattr(github_org, "scan_org", fake_scan_org)
+    monkeypatch.setattr(subdomains_extra, "enrich_subdomains", fake_enrich)
+    monkeypatch.setattr(
+        email_patterns,
+        "generate_bulk",
+        lambda names, domain: [
+            EmailCandidate(
+                email="a.b@acme.com",
+                first_name="ada",
+                last_name="byron",
+                pattern="{first}.{last}",
+                domain=domain,
+            )
+        ]
+        if names
+        else [],
+    )
+
+    cfg = ScanConfig(
+        username="u",
+        redteam_domain="acme.com",
+        redteam_names_file=str(names_path),
+        redteam_github_org="acme",
+    )
+    result = ScanResult(username="u")
+    await _phase_recon(client=None, cfg=cfg, result=result)
+
+    assert len(result.email_candidates) == 1
+    assert len(result.github_committers) == 1
+    assert len(result.recon_subdomains) == 2
+    assert result.recon_subdomains[0]["host"] == "api.acme.com"
+
+    payload = result.to_dict()
+    assert "email_candidates" in payload
+    assert "github_committers" in payload
+    assert "recon_subdomains" in payload
+    assert payload["email_candidates"][0]["email"] == "a.b@acme.com"

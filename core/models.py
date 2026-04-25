@@ -86,6 +86,9 @@ class ScanResult:
     ghunt_results: list = field(default_factory=list)  # GHuntResult entries
     toutatis_results: list = field(default_factory=list)  # ToutatisResult entries
     passive_hits: list = field(default_factory=list)  # PassiveHit entries
+    email_candidates: list = field(default_factory=list)  # EmailCandidate dicts
+    github_committers: list = field(default_factory=list)  # GithubCommitter dicts
+    recon_subdomains: list = field(default_factory=list)  # ReconSubdomain dicts
     reverse_image_hits: list = field(default_factory=list)  # ReverseImageHit
     historical_usernames: list = field(default_factory=list)  # HistoricalUsername
     phone_intel: list = field(default_factory=list)  # PhoneIntel entries
@@ -94,6 +97,7 @@ class ScanResult:
     enrichment: dict | None = None  # EnrichmentReport.to_dict() or None
     scan_time: float = 0.0
     ai_report: dict | None = None
+    investigator_summary: dict | None = None
 
     @property
     def found_platforms(self):
@@ -217,6 +221,18 @@ class ScanResult:
                 hit.to_dict() if hasattr(hit, "to_dict") else hit
                 for hit in self.passive_hits
             ],
+            "email_candidates": [
+                c.to_dict() if hasattr(c, "to_dict") else c
+                for c in self.email_candidates
+            ],
+            "github_committers": [
+                g.to_dict() if hasattr(g, "to_dict") else g
+                for g in self.github_committers
+            ],
+            "recon_subdomains": [
+                s.to_dict() if hasattr(s, "to_dict") else s
+                for s in self.recon_subdomains
+            ],
             "reverse_image_hits": [
                 hit.to_dict() if hasattr(hit, "to_dict") else hit
                 for hit in self.reverse_image_hits
@@ -239,4 +255,5 @@ class ScanResult:
             ],
             "enrichment": self.enrichment,
             "ai_report": self.ai_report,
+            "investigator_summary": self.investigator_summary,
         }

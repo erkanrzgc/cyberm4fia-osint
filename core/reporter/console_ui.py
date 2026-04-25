@@ -12,6 +12,7 @@ from rich.table import Table
 from rich.tree import Tree
 
 from core.config import BANNER, CATEGORIES
+from core.investigator_summary import build_investigator_summary
 from core.models import PlatformResult, ScanResult
 
 console = Console()
@@ -121,6 +122,7 @@ def print_progress(current: int, total: int, platform: str, found: bool) -> None
 def print_results(result: ScanResult) -> None:
     console.print("\n")
     _print_summary(result)
+    _print_investigator_summary(result)
 
     if not result.found_platforms:
         console.print("\n  [yellow]No profiles found on any platform.[/yellow]\n")
@@ -138,6 +140,7 @@ def print_results(result: ScanResult) -> None:
     _print_whois(result)
     _print_dns(result)
     _print_subdomains(result)
+    _print_redteam_recon(result)
     _print_web_presence(result)
     _print_variations(result)
     _print_discovered_usernames(result)
@@ -185,6 +188,59 @@ def _print_summary(result: ScanResult) -> None:
     )
     console.print(
         Panel(summary, title="[bold green]SCAN COMPLETE[/bold green]", border_style="green")
+    )
+
+
+def _print_investigator_summary(result: ScanResult) -> None:
+    summary = getattr(result, "investigator_summary", None) or build_investigator_summary(
+        result.to_dict()
+    )
+    headline = summary.get("headline") or ""
+    priority_score = summary.get("priority_score", 0)
+    confidence_band = str(summary.get("confidence_band") or "low").replace("_", " ")
+    overview = summary.get("overview") or []
+    risks = summary.get("risk_flags") or []
+    next_steps = summary.get("next_steps") or []
+    grouped_actions = summary.get("recommended_actions_by_severity") or {}
+    body_lines = [headline] if headline else []
+    body_lines.append(
+        f"[bold]Priority Score:[/bold] {priority_score}/100   "
+        f"[bold]Confidence Band:[/bold] {confidence_band}"
+    )
+    if overview:
+        body_lines.append("\n[bold]Overview:[/bold]")
+        body_lines.extend(f"  - {item}" for item in overview)
+    if risks:
+        body_lines.append("\n[bold red]Risk Flags:[/bold red]")
+        for risk in risks:
+            severity = str(risk.get("severity") or "low").upper()
+            title = risk.get("title") or "Signal"
+            detail = risk.get("detail") or ""
+            body_lines.append(f"  - [{severity}] {title}: {detail}")
+    if next_steps:
+        body_lines.append("\n[bold]Next Steps:[/bold]")
+        body_lines.extend(f"  - {item}" for item in next_steps)
+    if grouped_actions:
+        labels = {
+            "high": "Immediate",
+            "medium": "Follow-up",
+            "low": "Background",
+        }
+        for key in ("high", "medium", "low"):
+            actions = grouped_actions.get(key) or []
+            if not actions:
+                continue
+            body_lines.append(f"\n[bold]{labels[key]} Actions:[/bold]")
+            body_lines.extend(f"  - {item}" for item in actions)
+    if not body_lines:
+        return
+    console.print(
+        Panel(
+            "\n".join(body_lines),
+            title="[bold cyan]INVESTIGATOR BRIEF[/bold cyan]",
+            border_style="cyan",
+            padding=(1, 2),
+        )
     )
 
 
@@ -524,6 +580,68 @@ def _print_subdomains(result: ScanResult) -> None:
             border_style="blue",
         )
     )
+
+
+def _print_redteam_recon(result: ScanResult) -> None:
+    """Render red-team recon output: extra subdomains, committers, email candidates."""
+    subs = getattr(result, "recon_subdomains", None) or []
+    committers = getattr(result, "github_committers", None) or []
+    candidates = getattr(result, "email_candidates", None) or []
+    if not (subs or committers or candidates):
+        return
+    console.print()
+
+    if subs:
+        unique_hosts = sorted({s.get("host", "") for s in subs if s.get("host")})
+        shown = unique_hosts[:30]
+        lines = [f"  • [cyan]{h}[/cyan]" for h in shown]
+        if len(unique_hosts) > 30:
+            lines.append(f"  [dim]... and {len(unique_hosts) - 30} more[/dim]")
+        console.print(
+            Panel(
+                "\n".join(lines),
+                title=f"[bold]Attack Surface — Subdomains ({len(unique_hosts)})[/bold]",
+                border_style="red",
+            )
+        )
+
+    if committers:
+        table = Table(
+            title="GitHub Org Committers",
+            box=box.SIMPLE_HEAVY,
+            title_style="bold red",
+            header_style="bold",
+        )
+        table.add_column("Email", min_width=28)
+        table.add_column("Name", min_width=16)
+        table.add_column("Repo", min_width=20)
+        table.add_column("NoReply", justify="center")
+        for c in committers[:30]:
+            noreply = "!" if c.get("is_noreply") else ""
+            table.add_row(
+                c.get("email", ""),
+                c.get("name", ""),
+                c.get("repo", ""),
+                noreply,
+            )
+        if len(committers) > 30:
+            table.caption = f"... and {len(committers) - 30} more"
+        console.print(table)
+
+    if candidates:
+        table = Table(
+            title="Email Pattern Candidates",
+            box=box.SIMPLE_HEAVY,
+            title_style="bold red",
+            header_style="bold",
+        )
+        table.add_column("Email", min_width=28)
+        table.add_column("Pattern", min_width=16)
+        for c in candidates[:30]:
+            table.add_row(c.get("email", ""), c.get("pattern", ""))
+        if len(candidates) > 30:
+            table.caption = f"... and {len(candidates) - 30} more"
+        console.print(table)
 
 
 def _print_web_presence(result: ScanResult) -> None:

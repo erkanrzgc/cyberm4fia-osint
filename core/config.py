@@ -121,6 +121,9 @@ class ScanConfig:
     screenshots: bool = False
     screenshot_dir: str | None = None
     geocode: bool = False
+    redteam_domain: str | None = None
+    redteam_names_file: str | None = None
+    redteam_github_org: str | None = None
 
     @classmethod
     def from_args(cls, args, username: str) -> ScanConfig:
@@ -205,6 +208,9 @@ class ScanConfig:
             phone_region=phone_region,
             crypto_addresses=crypto_addresses,
             enrichment=not getattr(args, "no_enrichment", False),
+            redteam_domain=(getattr(args, "redteam_domain", None) or None),
+            redteam_names_file=(getattr(args, "redteam_names_file", None) or None),
+            redteam_github_org=(getattr(args, "redteam_github_org", None) or None),
         )
 
     def mode_parts(self) -> list[str]:
@@ -228,6 +234,7 @@ class ScanConfig:
             (self.past_usernames, "PastUsernames"),
             (bool(self.phone), "Phone"),
             (bool(self.crypto_addresses), "Crypto"),
+            (bool(self.redteam_domain), "Redteam"),
             (self.enrichment, "Enrichment"),
             (self.tor, "Tor"),
         ]

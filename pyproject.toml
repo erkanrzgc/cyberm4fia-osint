@@ -40,6 +40,7 @@ extract = ["socid-extractor>=0.0.25"]
 holehe = ["holehe>=1.61", "httpx>=0.24.0"]
 ghunt = ["ghunt>=2.3.0", "httpx>=0.24.0"]
 toutatis = ["toutatis>=1.4"]
+phone = ["phonenumbers>=8.13"]
 tor = ["stem>=1.8.2"]
 browser = ["playwright>=1.40.0"]
 ai = [
@@ -62,6 +63,7 @@ all = [
     "httpx>=0.24.0",
     "ghunt>=2.3.0",
     "toutatis>=1.4",
+    "phonenumbers>=8.13",
     "stem>=1.8.2",
     "playwright>=1.40.0",
     "llama-cpp-python>=0.3.0",

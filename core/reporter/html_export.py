@@ -10,6 +10,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from html import escape
 
+from core.investigator_summary import build_investigator_summary
 from core.models import ScanResult
 from core.reporter.console_ui import console
 from core.reporter.html_style import HTML_STYLE
@@ -316,6 +317,60 @@ def _subdomain_block(data: dict) -> str:
     </div>"""
 
 
+def _redteam_recon_block(data: dict) -> str:
+    subs = data.get("recon_subdomains") or []
+    committers = data.get("github_committers") or []
+    candidates = data.get("email_candidates") or []
+    if not (subs or committers or candidates):
+        return ""
+
+    sections: list[str] = []
+
+    if subs:
+        hosts = sorted({s.get("host", "") for s in subs if s.get("host")})
+        sections.append(f"""
+        <div class="card">
+            <h3>Attack Surface — Subdomains ({len(hosts)})</h3>
+            {_render_badges(hosts)}
+        </div>""")
+
+    if committers:
+        rows = "".join(
+            f"<tr><td>{escape(str(c.get('email', '')))}</td>"
+            f"<td>{escape(str(c.get('name', '')))}</td>"
+            f"<td>{escape(str(c.get('repo', '')))}</td>"
+            f"<td>{'yes' if c.get('is_noreply') else ''}</td></tr>"
+            for c in committers
+        )
+        sections.append(f"""
+        <div class="card">
+            <h3>GitHub Org Committers ({len(committers)})</h3>
+            <table>
+                <thead><tr><th>Email</th><th>Name</th><th>Repo</th><th>NoReply</th></tr></thead>
+                <tbody>{rows}</tbody>
+            </table>
+        </div>""")
+
+    if candidates:
+        rows = "".join(
+            f"<tr><td>{escape(str(c.get('email', '')))}</td>"
+            f"<td>{escape(str(c.get('pattern', '')))}</td></tr>"
+            for c in candidates
+        )
+        sections.append(f"""
+        <div class="card">
+            <h3>Email Pattern Candidates ({len(candidates)})</h3>
+            <table>
+                <thead><tr><th>Email</th><th>Pattern</th></tr></thead>
+                <tbody>{rows}</tbody>
+            </table>
+        </div>""")
+
+    return f"""
+    <h2>Red-Team Recon</h2>
+    {''.join(sections)}"""
+
+
 def _variations_block(data: dict) -> str:
     if not (data["variations_checked"] or data["discovered_usernames"]):
         return ""
@@ -329,6 +384,74 @@ def _variations_block(data: dict) -> str:
         <div class="card">
             <h3>Discovered Linked Accounts</h3>
             {_render_badges(data['discovered_usernames'])}
+        </div>
+    </div>"""
+
+
+def _investigator_brief_block(data: dict) -> str:
+    brief = data.get("investigator_summary") or build_investigator_summary(data)
+    headline = escape(str(brief.get("headline") or ""))
+    priority_score = escape(str(brief.get("priority_score") or 0))
+    confidence_band = escape(str(brief.get("confidence_band") or "low").replace("_", " "))
+    overview = brief.get("overview") or []
+    risks = brief.get("risk_flags") or []
+    next_steps = brief.get("next_steps") or []
+    grouped_actions = brief.get("recommended_actions_by_severity") or {}
+
+    def _items(items: list[str]) -> str:
+        if not items:
+            return '<p class="muted">No highlights.</p>'
+        return "<ul>" + "".join(f"<li>{escape(str(item))}</li>" for item in items) + "</ul>"
+
+    risk_html = ""
+    if risks:
+        risk_html = "".join(
+            f"""
+            <li class="risk-item risk-{escape(str(risk.get('severity') or 'low'))}">
+                <strong>{escape(str(risk.get('title') or 'Signal'))}</strong>
+                <span>{escape(str(risk.get('detail') or ''))}</span>
+            </li>"""
+            for risk in risks
+        )
+        risk_html = f"<ul class='risk-list'>{risk_html}</ul>"
+    else:
+        risk_html = '<p class="muted">No immediate exposure flags.</p>'
+
+    action_html = ""
+    for key, label in (("high", "Immediate"), ("medium", "Follow-up"), ("low", "Background")):
+        items = grouped_actions.get(key) or []
+        if not items:
+            continue
+        action_html += (
+            f"<h4>{label}</h4>"
+            + _items(items)
+        )
+    if not action_html:
+        action_html = '<p class="muted">No action buckets.</p>'
+
+    return f"""
+    <h2>Investigator Brief</h2>
+    <div class="brief-headline">{headline}</div>
+    <div class="brief-metrics">
+        <div class="metric-chip"><span>Priority</span><strong>{priority_score}/100</strong></div>
+        <div class="metric-chip"><span>Confidence</span><strong>{confidence_band}</strong></div>
+    </div>
+    <div class="grid grid-3">
+        <div class="card">
+            <h3>Overview</h3>
+            {_items(overview)}
+        </div>
+        <div class="card">
+            <h3>Risk Flags</h3>
+            {risk_html}
+        </div>
+        <div class="card">
+            <h3>Next Steps</h3>
+            {_items(next_steps)}
+        </div>
+        <div class="card card-full">
+            <h3>Recommended Actions By Severity</h3>
+            {action_html}
         </div>
     </div>"""
 
@@ -353,6 +476,7 @@ def render_html(data: dict) -> str:
         <p>Duration: <span>{escape(str(data['scan_time']))}s</span></p>
     </div>
 
+    {_investigator_brief_block(data)}
     {_platforms_table(data)}
 
     <h2>Profile Details</h2>
@@ -369,6 +493,7 @@ def render_html(data: dict) -> str:
     {_whois_block(data)}
     {_dns_block(data)}
     {_subdomain_block(data)}
+    {_redteam_recon_block(data)}
     {_variations_block(data)}
 </body>
 </html>"""
@@ -376,6 +501,8 @@ def render_html(data: dict) -> str:
 
 def export_html(result: ScanResult, filepath: str) -> None:
     data = result.to_dict()
+    if not data.get("investigator_summary"):
+        data["investigator_summary"] = build_investigator_summary(data)
     data["exported_at"] = datetime.now(tz=timezone.utc).isoformat()
     html = render_html(data)
     with open(filepath, "w", encoding="utf-8") as f:

@@ -21,8 +21,11 @@ import json
 import sys
 from typing import Any, cast
 
+from core import cases, watchlist
 from core.config import ScanConfig
 from core.engine import run_scan
+from core.history import get_latest, get_scan, list_scans
+from core.scan_service import complete_scan_result
 from utils.helpers import sanitize_username
 
 PROTOCOL_VERSION = "2024-11-05"
@@ -47,7 +50,82 @@ TOOLS = [
             },
             "required": ["username"],
         },
-    }
+    },
+    {
+        "name": "get_scan",
+        "description": "Fetch a saved scan payload by scan_id or latest username history.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "scan_id": {"type": "integer", "description": "History row ID"},
+                "username": {"type": "string", "description": "Fallback: latest scan for username"},
+            },
+        },
+    },
+    {
+        "name": "list_history",
+        "description": "List recent saved scans for a username.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "username": {"type": "string", "description": "Target username"},
+                "limit": {"type": "integer", "default": 20},
+            },
+            "required": ["username"],
+        },
+    },
+    {
+        "name": "add_watchlist",
+        "description": "Add or update a watchlist entry.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "username": {"type": "string", "description": "Target username"},
+                "tags": {"type": "array", "items": {"type": "string"}},
+                "notes": {"type": "string", "default": ""},
+            },
+            "required": ["username"],
+        },
+    },
+    {
+        "name": "list_cases",
+        "description": "List investigation cases with status and timestamps.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+        },
+    },
+    {
+        "name": "redteam_recon",
+        "description": (
+            "Corporate red-team recon: email pattern candidates for given "
+            "employee names, GitHub org committer harvest, extra subdomain "
+            "sources on top of the built-in DNS enumerator. Any combination "
+            "of names / github_org may be omitted."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "domain": {
+                    "type": "string",
+                    "description": "Target corporate domain (e.g. acme.com)",
+                },
+                "names": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Full employee names for email pattern generation",
+                },
+                "github_org": {
+                    "type": "string",
+                    "description": "GitHub org to harvest committer emails from "
+                    "(defaults to the first label of domain)",
+                },
+                "max_repos": {"type": "integer", "default": 30},
+                "commits_per_repo": {"type": "integer", "default": 30},
+            },
+            "required": ["domain"],
+        },
+    },
 ]
 
 
@@ -82,7 +160,132 @@ async def _scan(args: dict) -> dict:
         categories=cat_tuple,
     )
     result = await run_scan(cfg)
-    return cast(dict, result.to_dict())
+    completed = complete_scan_result(
+        result,
+        cfg,
+        save_history=False,
+        mark_watchlist=False,
+    )
+    return cast(dict, completed.payload)
+
+
+def _get_scan(args: dict) -> dict:
+    scan_id = args.get("scan_id")
+    username = args.get("username")
+    entry = None
+    if isinstance(scan_id, int):
+        entry = get_scan(scan_id)
+    elif isinstance(username, str) and username.strip():
+        entry = get_latest(username.strip())
+    else:
+        raise ValueError("provide either scan_id or username")
+    if entry is None:
+        raise ValueError("scan not found")
+    return {
+        "id": entry.id,
+        "username": entry.username,
+        "ts": entry.ts,
+        "found_count": entry.found_count,
+        "payload": entry.payload,
+    }
+
+
+def _list_history(args: dict) -> dict:
+    username = args.get("username")
+    if not isinstance(username, str) or not username.strip():
+        raise ValueError("username must be a non-empty string")
+    limit = args.get("limit", 20)
+    try:
+        limit_int = max(1, min(int(limit), 100))
+    except (TypeError, ValueError):
+        limit_int = 20
+    entries = list_scans(username.strip(), limit=limit_int)
+    return {
+        "username": username.strip(),
+        "count": len(entries),
+        "entries": [
+            {"id": entry.id, "ts": entry.ts, "found_count": entry.found_count}
+            for entry in entries
+        ],
+    }
+
+
+def _add_watchlist(args: dict) -> dict:
+    raw = args.get("username")
+    if not isinstance(raw, str):
+        raise ValueError("username must be a string")
+    username = sanitize_username(raw)
+    if not username:
+        raise ValueError("invalid username")
+    tags = args.get("tags") or []
+    if not isinstance(tags, list):
+        raise ValueError("tags must be a list of strings")
+    notes = args.get("notes", "")
+    entry = watchlist.add(
+        username,
+        tags=[str(tag) for tag in tags if str(tag).strip()],
+        notes=str(notes or ""),
+    )
+    return entry.to_dict()
+
+
+def _list_cases(_args: dict) -> dict:
+    entries = cases.list_cases()
+    return {
+        "count": len(entries),
+        "entries": [entry.to_dict() for entry in entries],
+    }
+
+
+async def _redteam_recon(args: dict) -> dict:
+    from core.http_client import HTTPClient
+    from modules.dns_lookup import enumerate_subdomains
+    from modules.recon import email_patterns, github_org, subdomains_extra
+
+    raw_domain = args.get("domain")
+    if not isinstance(raw_domain, str) or not raw_domain.strip():
+        raise ValueError("domain must be a non-empty string")
+    domain = raw_domain.strip().lower().lstrip("@")
+
+    names = args.get("names") or []
+    if not isinstance(names, list):
+        raise ValueError("names must be a list of strings")
+    name_list = [str(n) for n in names if str(n).strip()]
+
+    raw_org = args.get("github_org")
+    org = (raw_org if isinstance(raw_org, str) and raw_org.strip() else domain.split(".", 1)[0]).strip()
+
+    max_repos = int(args.get("max_repos", github_org.DEFAULT_MAX_REPOS))
+    commits_per_repo = int(args.get("commits_per_repo", github_org.DEFAULT_COMMITS_PER_REPO))
+
+    async with HTTPClient() as client:
+        seed_subs, committers = await asyncio.gather(
+            enumerate_subdomains(client, domain),
+            github_org.scan_org(
+                client,
+                org,
+                max_repos=max_repos,
+                commits_per_repo=commits_per_repo,
+            ),
+        )
+        subs = await subdomains_extra.enrich_subdomains(
+            client, domain, existing=seed_subs
+        )
+
+    candidates = email_patterns.generate_bulk(name_list, domain) if name_list else []
+
+    return {
+        "domain": domain,
+        "github_org": org,
+        "email_candidates": [c.to_dict() for c in candidates],
+        "github_committers": [g.to_dict() for g in committers],
+        "subdomains": [s.to_dict() for s in subs],
+        "counts": {
+            "email_candidates": len(candidates),
+            "github_committers": len(committers),
+            "subdomains": len(subs),
+        },
+    }
 
 
 async def _dispatch(request: dict) -> dict | None:
@@ -105,10 +308,20 @@ async def _dispatch(request: dict) -> dict | None:
         return _ok(msg_id, {"tools": TOOLS})
     if method == "tools/call":
         name = params.get("name")
-        if name != "scan_username":
+        handlers = {
+            "scan_username": _scan,
+            "get_scan": _get_scan,
+            "list_history": _list_history,
+            "add_watchlist": _add_watchlist,
+            "list_cases": _list_cases,
+            "redteam_recon": _redteam_recon,
+        }
+        handler = handlers.get(str(name))
+        if handler is None:
             return _err(msg_id, -32601, f"unknown tool: {name}")
         try:
-            payload = await _scan(params.get("arguments") or {})
+            arguments = params.get("arguments") or {}
+            payload = await handler(arguments) if asyncio.iscoroutinefunction(handler) else handler(arguments)
         except (ValueError, RuntimeError) as exc:
             return _ok(
                 msg_id,

@@ -10,6 +10,7 @@ from core.history import (
     get_latest,
     list_scans,
     save_scan,
+    update_scan_payload,
 )
 
 
@@ -120,3 +121,21 @@ def test_save_rejects_empty_username(db: Path):
 def test_save_rejects_missing_username(db: Path):
     with pytest.raises(ValueError):
         save_scan({"found_count": 0, "platforms": []}, ts=1, db_path=db)
+
+
+def test_update_scan_payload_replaces_json_blob(db: Path):
+    scan_id = save_scan(_payload("alice", ["GitHub"]), ts=1000, db_path=db)
+    ok = update_scan_payload(
+        scan_id,
+        {
+            **_payload("alice", ["GitHub"]),
+            "schema_version": "test",
+            "scan_id": scan_id,
+        },
+        db_path=db,
+    )
+    assert ok is True
+    updated = get_latest("alice", db_path=db)
+    assert updated is not None
+    assert updated.payload["schema_version"] == "test"
+    assert updated.payload["scan_id"] == scan_id

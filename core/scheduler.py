@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import asyncio
 import time
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
-from typing import Callable, Awaitable
 
 from core import history, watchlist
 from core.config import ScanConfig
@@ -21,7 +21,7 @@ from core.logging_setup import get_logger
 from core.models import ScanResult
 from core.notify import Notification, build_default_notifiers, notify_all
 from core.notify.base import Notifier
-from core.search import index_scan
+from core.scan_service import complete_scan_result
 
 log = get_logger(__name__)
 
@@ -56,7 +56,7 @@ async def _scan_one(
     cfg = replace(cfg_template, username=username)
     try:
         result = await runner(cfg)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log.warning("scheduler: scan failed for %s: %s", username, exc)
         await notify_all(
             Notification(
@@ -69,7 +69,6 @@ async def _scan_one(
         )
         return 0, False
 
-    payload = result.to_dict()
     now = int(time.time())
 
     hist_db = history.DEFAULT_DB_PATH
@@ -77,15 +76,20 @@ async def _scan_one(
 
     previous = history.get_latest(username, db_path=hist_db)
     try:
-        scan_id = history.save_scan(payload, ts=now, db_path=hist_db)
+        completed = complete_scan_result(
+            result,
+            cfg,
+            save_history=True,
+            mark_watchlist=True,
+            ts=now,
+            history_db=hist_db,
+            watchlist_db=wl_db,
+        )
     except (OSError, ValueError) as exc:
-        log.warning("scheduler: could not save scan for %s: %s", username, exc)
+        log.warning("scheduler: could not finalize scan for %s: %s", username, exc)
         scan_id = -1
     else:
-        if scan_id > 0:
-            index_scan(scan_id, payload, db_path=hist_db)
-
-    watchlist.mark_scanned(username, ts=now, db_path=wl_db)
+        scan_id = completed.scan_id or -1
 
     found_count = sum(1 for p in result.platforms if p.exists)
     await notify_all(
@@ -140,7 +144,7 @@ async def run_once(
             s, d = await _scan_one(entry.username, cfg_template, sinks, runner=runner)
             scans += s
             diffs += d
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             errors += 1
             log.exception("scheduler: unhandled error for %s: %s", entry.username, exc)
     return SchedulerStats(passes=1, scans=scans, diffs=diffs, errors=errors)

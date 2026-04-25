@@ -6,7 +6,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import sys
-import time
+from dataclasses import replace
 from datetime import datetime, timezone
 
 from core import watchlist
@@ -14,8 +14,7 @@ from core.bulk import load_usernames_from_file, run_bulk
 from core.config import ScanConfig
 from core.engine import run_scan
 from core.graph_export import export_dot
-from core.history import diff_entries, get_latest, list_scans, save_scan
-from core.search import index_scan, search as history_search
+from core.history import diff_entries, get_latest, list_scans
 from core.logging_setup import configure_logging, get_logger
 from core.plugins import load_plugins
 from core.reporter import (
@@ -34,6 +33,8 @@ from core.reporter import (
     print_scan_start,
     xlsx_available,
 )
+from core.scan_service import complete_scan_result
+from core.search import search as history_search
 from modules.platforms import get_platform_count
 from utils.helpers import sanitize_username
 
@@ -360,6 +361,50 @@ def build_parser() -> argparse.ArgumentParser:
         "--schedule-interval", dest="schedule_interval", type=float, default=60.0,
         help="Minutes between scheduled passes (default 60)",
     )
+    # ── Red-team recon mode (corporate attack surface, CSV exports only) ──
+    p.add_argument(
+        "--redteam-domain", dest="redteam_domain", type=str, default=None,
+        help="Enable red-team recon for a corporate domain (e.g. acme.com)",
+    )
+    p.add_argument(
+        "--redteam-names-file", dest="redteam_names_file", type=str, default=None,
+        help="Newline-delimited file of employee full names for email pattern generation",
+    )
+    p.add_argument(
+        "--redteam-github-org", dest="redteam_github_org", type=str, default=None,
+        help="GitHub org to harvest committer emails from (defaults to domain label)",
+    )
+    p.add_argument(
+        "--redteam-out", dest="redteam_out", type=str, default="reports/redteam",
+        help="Output directory for red-team CSVs (default reports/redteam)",
+    )
+    # ── Social engineering arsenal (opt-in, needs a preceding --redteam-*) ──
+    p.add_argument(
+        "--se-arsenal", dest="se_arsenal", action="store_true",
+        help="After red-team recon, generate lookalike domains + (optional) "
+        "GoPhish push + LLM pretext drafts",
+    )
+    p.add_argument(
+        "--se-gophish-url", dest="se_gophish_url", type=str, default=None,
+        help="GoPhish base URL (e.g. https://host:3333). If set with --se-gophish-key, "
+        "pushes targets as a new group",
+    )
+    p.add_argument(
+        "--se-gophish-key", dest="se_gophish_key", type=str, default=None,
+        help="GoPhish API key (defaults to $GOPHISH_API_KEY)",
+    )
+    p.add_argument(
+        "--se-gophish-insecure", dest="se_gophish_insecure", action="store_true",
+        help="Skip TLS verification for GoPhish (self-signed lab hosts only)",
+    )
+    p.add_argument(
+        "--se-pretext-targets", dest="se_pretext_targets", type=str, default=None,
+        help="Comma-separated target emails for LLM pretext drafts (max ~5)",
+    )
+    p.add_argument(
+        "--se-pretext-hint", dest="se_pretext_hint", type=str, default="",
+        help="Operator hint steering pretext style (e.g. 'Q1 close, vendor invoice')",
+    )
     return p
 
 
@@ -392,7 +437,7 @@ def _run_ai_analysis(result) -> None:
     console.print("  [cyan]Running AI analysis (local LLM)...[/cyan]")
     try:
         report = analyzer.analyze(result.to_dict())
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log.warning("AI analysis failed: %s", exc)
         return
     result.ai_report = report.to_dict()
@@ -514,25 +559,21 @@ async def _run_bulk_mode(usernames: list[str], args, from_watchlist: bool) -> No
 
     for username, result in zip(usernames, results, strict=True):
         print_results(result)
-        if not args.no_history:
-            payload = result.to_dict()
-            try:
-                scan_id = save_scan(payload, ts=int(time.time()))
-            except (OSError, ValueError) as exc:
-                log.warning("history: save failed for %s: %s", username, exc)
-            else:
-                if scan_id > 0:
-                    index_scan(scan_id, payload)
-        if from_watchlist:
-            try:
-                watchlist.mark_scanned(username)
-            except Exception as exc:  # noqa: BLE001
-                log.warning("watchlist mark_scanned failed: %s", exc)
+        cfg = replace(cfg_template, username=username)
+        try:
+            complete_scan_result(
+                result,
+                cfg,
+                save_history=not args.no_history,
+                mark_watchlist=from_watchlist,
+            )
+        except (OSError, ValueError) as exc:
+            log.warning("scan finalization failed for %s: %s", username, exc)
         try:
             plugin_registry.run_post_scan(
-                result, ScanConfig(username=username)
+                result, cfg
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.warning("plugin hooks failed for %s: %s", username, exc)
 
     console.print(
@@ -567,7 +608,7 @@ def _run_correlate(spec: str) -> None:
         sys.exit(1)
 
     result = correlate(a_entry.payload, b_entry.payload)
-    pct = int(round(result.score * 100))
+    pct = round(result.score * 100)
     verdict_color = {
         "very_likely_same": "bright_green",
         "likely_same": "green",
@@ -585,7 +626,7 @@ def _run_correlate(spec: str) -> None:
         return
     for sig in result.signals:
         console.print(
-            f"    [cyan]{sig.kind:<9}[/cyan] +{int(round(sig.weight * 100)):>3}%  {sig.detail}"
+            f"    [cyan]{sig.kind:<9}[/cyan] +{round(sig.weight * 100):>3}%  {sig.detail}"
         )
 
 
@@ -822,7 +863,7 @@ def _run_social_graph(spec: str) -> None:
     neighbors_a, neighbors_b = asyncio.run(_go())
     overlap = compute_overlap(neighbors_a, neighbors_b)
 
-    pct = int(round(overlap.combined_score * 100))
+    pct = round(overlap.combined_score * 100)
     console.print(
         f"\n  [bold]{a_user}[/bold] ({len(neighbors_a.followers)} followers, "
         f"{len(neighbors_a.following)} following) ↔ "
@@ -872,11 +913,158 @@ def _run_search_history(query: str) -> None:
             console.print(f"    [dim]{hit.snippet}[/dim]")
 
 
+def _load_names(path: str) -> list[str]:
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            return [line.strip() for line in fh if line.strip()]
+    except OSError as exc:
+        console.print(f"  [red]Could not read names file {path}: {exc}[/red]")
+        return []
+
+
+async def _redteam_pipeline(args: argparse.Namespace) -> int:
+    """Run every red-team phase and emit CSVs. Returns exit code."""
+    from pathlib import Path
+
+    from core.http_client import HTTPClient
+    from core.reporter.redteam_export import (
+        export_attack_surface,
+        export_phishing_targets,
+    )
+    from modules.dns_lookup import enumerate_subdomains
+    from modules.recon import email_patterns, github_org, subdomains_extra
+
+    domain = args.redteam_domain.strip().lower().lstrip("@")
+    org = (args.redteam_github_org or domain.split(".", 1)[0]).strip()
+    names = _load_names(args.redteam_names_file) if args.redteam_names_file else []
+    out_dir = Path(args.redteam_out)
+
+    console.print(
+        f"  [cyan]Red-team recon[/cyan] domain=[bold]{domain}[/bold] "
+        f"github_org=[bold]{org}[/bold] names={len(names)}"
+    )
+
+    async with HTTPClient() as client:
+        seed_subs, committers = await asyncio.gather(
+            enumerate_subdomains(client, domain),
+            github_org.scan_org(client, org),
+        )
+        subs = await subdomains_extra.enrich_subdomains(
+            client, domain, existing=seed_subs
+        )
+
+    candidates = email_patterns.generate_bulk(names, domain) if names else []
+
+    targets_path = out_dir / "phishing_targets.csv"
+    surface_path = out_dir / "attack_surface.csv"
+    n_targets = export_phishing_targets(
+        targets_path, candidates=candidates, committers=committers
+    )
+    n_surface = export_attack_surface(surface_path, subs)
+
+    console.print(
+        f"  [green]targets[/green]={n_targets} → {targets_path}\n"
+        f"  [green]surface[/green]={n_surface} → {surface_path}\n"
+        f"  [green]committers[/green]={len(committers)} "
+        f"[green]candidates[/green]={len(candidates)}"
+    )
+
+    if getattr(args, "se_arsenal", False):
+        _se_arsenal_stage(
+            args,
+            out_dir=out_dir,
+            domain=domain,
+            subs=subs,
+            candidates=candidates,
+            committers=committers,
+        )
+    return 0
+
+
+def _se_arsenal_stage(
+    args: argparse.Namespace,
+    *,
+    out_dir,
+    domain: str,
+    subs: list,
+    candidates: list,
+    committers: list,
+) -> None:
+    """Run lookalike + GoPhish push + LLM pretext stages after recon."""
+    import csv
+    import os
+
+    from modules.se_arsenal import gophish_client, lookalike, pretext
+
+    # ── lookalike domains ─────────────────────────────────────────────
+    seed_domains = [domain] + sorted(
+        {s.host for s in subs if s.host and "." in s.host}
+    )[:20]
+    look = lookalike.generate_bulk(seed_domains)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    look_path = out_dir / "lookalike_domains.csv"
+    with open(look_path, "w", encoding="utf-8-sig", newline="") as fh:
+        writer = csv.writer(fh)
+        writer.writerow(["domain", "technique", "base"])
+        for r in look:
+            writer.writerow([r.domain, r.technique, r.base])
+    console.print(
+        f"  [green]lookalikes[/green]={len(look)} → {look_path}"
+    )
+
+    # ── GoPhish push (optional) ────────────────────────────────────────
+    gurl = args.se_gophish_url
+    gkey = args.se_gophish_key or os.environ.get("GOPHISH_API_KEY", "")
+    if gurl and gkey:
+        targets = gophish_client.targets_from_candidates(
+            candidates=candidates, committers=committers
+        )
+        try:
+            client = gophish_client.GoPhishClient(
+                gurl, gkey, verify_tls=not args.se_gophish_insecure
+            )
+            resp = client.push_group(f"cyberm4fia-{domain}", targets)
+            console.print(
+                f"  [green]gophish[/green] group id={resp.get('id')} "
+                f"targets={len(targets)}"
+            )
+        except gophish_client.GoPhishError as exc:
+            console.print(f"  [red]gophish push failed:[/red] {exc}")
+
+    # ── LLM pretext drafts (optional) ──────────────────────────────────
+    raw_targets = (args.se_pretext_targets or "").strip()
+    if raw_targets:
+        target_emails = [t.strip() for t in raw_targets.split(",") if t.strip()][:5]
+        payload = {
+            "username": domain,
+            "platforms": [],
+            "recon_subdomains": [s.to_dict() for s in subs],
+            "github_committers": [c.to_dict() for c in committers],
+            "emails": [{"email": t} for t in target_emails],
+        }
+        drafts = pretext.generate_bulk(
+            payload, target_emails, scenario_hint=args.se_pretext_hint
+        )
+        pretext_dir = out_dir / "pretexts"
+        pretext_dir.mkdir(parents=True, exist_ok=True)
+        for draft in drafts:
+            safe = draft.target_email.replace("@", "_at_").replace("/", "_")
+            path = pretext_dir / f"{safe}.md"
+            path.write_text(pretext.render_markdown(draft), encoding="utf-8")
+        console.print(
+            f"  [green]pretexts[/green]={len(drafts)}/{len(target_emails)} "
+            f"→ {pretext_dir}"
+        )
+
+
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
 
     configure_logging(args.log_level)
+
+    if args.redteam_domain and not args.username:
+        sys.exit(asyncio.run(_redteam_pipeline(args)))
 
     if args.serve:
         from core.api import is_available as api_available
@@ -894,8 +1082,8 @@ def main() -> None:
         return
 
     if args.schedule:
-        from core.scheduler import run_forever
         from core.notify import build_default_notifiers
+        from core.scheduler import run_forever
 
         cfg_template = ScanConfig.from_args(args, username="")
         sinks = build_default_notifiers()
@@ -987,15 +1175,15 @@ def main() -> None:
 
     print_results(result)
 
-    if not args.no_history:
-        payload = result.to_dict()
-        try:
-            scan_id = save_scan(payload, ts=int(time.time()))
-        except (OSError, ValueError) as exc:
-            log.warning("history: save failed: %s", exc)
-        else:
-            if scan_id > 0:
-                index_scan(scan_id, payload)
+    try:
+        complete_scan_result(
+            result,
+            cfg,
+            save_history=not args.no_history,
+            mark_watchlist=True,
+        )
+    except (OSError, ValueError) as exc:
+        log.warning("scan finalization failed: %s", exc)
 
     if args.diff:
         _print_diff(username, result)
@@ -1006,7 +1194,7 @@ def main() -> None:
     try:
         plugin_registry = load_plugins()
         plugin_registry.run_post_scan(result, cfg)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log.warning("plugin hooks failed: %s", exc)
 
 

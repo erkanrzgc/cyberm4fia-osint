@@ -100,6 +100,21 @@ button:hover { transform: translateY(-1px); box-shadow: 0 8px 24px -8px var(--ac
 button:active { transform: translateY(0); }
 
 #scan-status { margin-top: 0.75rem; font-family: var(--mono); font-size: 0.85rem; color: var(--muted); }
+#capability-status,
+#job-status {
+  margin-bottom: 0.75rem;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+#history-status,
+#scan-case-target,
+#history-diff {
+  margin-bottom: 0.75rem;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--muted);
+}
 #scan-output {
   margin-top: 0.75rem;
   max-height: 420px;
@@ -112,8 +127,100 @@ button:active { transform: translateY(0); }
   font-size: 0.78rem;
   color: var(--muted);
 }
+.brief-panel {
+  display: none;
+  margin-top: 0.9rem;
+  padding: 0.9rem 1rem;
+  border-radius: 12px;
+  background: var(--surface-hi);
+  border: 1px solid var(--border);
+}
+.brief-panel.show { display: block; }
+#brief-headline {
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  color: var(--text);
+  margin-bottom: 0.85rem;
+}
+#brief-metrics {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.85rem;
+}
+.metric-pill {
+  min-width: 160px;
+  padding: 0.65rem 0.8rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+}
+.metric-pill span {
+  display: block;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin-bottom: 0.15rem;
+}
+.metric-pill strong {
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  color: var(--accent);
+  text-transform: capitalize;
+}
+.brief-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+.brief-card-full { grid-column: 1 / -1; }
+.brief-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.75rem 0.85rem;
+}
+.brief-card h3 {
+  margin: 0 0 0.6rem;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+.brief-card ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+}
+.brief-card li {
+  padding: 0.35rem 0;
+  border-bottom: 1px dashed var(--border);
+}
+.brief-card li:last-child { border-bottom: none; }
+.brief-card li.empty { color: var(--muted); }
+.brief-card li strong {
+  display: block;
+  color: var(--text);
+  margin-bottom: 0.15rem;
+}
+.brief-card li span { color: var(--muted); }
+.brief-card li.risk-high { border-left: 3px solid var(--accent); padding-left: 0.5rem; }
+.brief-card li.risk-medium { border-left: 3px solid #ffb36b; padding-left: 0.5rem; }
+.brief-card li.risk-low { border-left: 3px solid #6cb7ff; padding-left: 0.5rem; }
+.brief-action-group + .brief-action-group { margin-top: 0.75rem; }
+.brief-action-group h4 {
+  margin: 0 0 0.45rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
 
 #watch-list { list-style: none; padding: 0; margin: 0; }
+#job-list { list-style: none; padding: 0; margin: 0; }
+#history-list { list-style: none; padding: 0; margin: 0; }
 #watch-list li {
   display: flex;
   justify-content: space-between;
@@ -123,6 +230,42 @@ button:active { transform: translateY(0); }
   font-family: var(--mono);
   font-size: 0.85rem;
 }
+#job-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+#history-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 0.82rem;
+}
+#history-list li:last-child { border-bottom: none; }
+.history-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+.history-actions button {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.74rem;
+}
+#job-list li:last-child { border-bottom: none; }
+#job-list li:hover { background: var(--surface-hi); }
+.job-status-completed { color: #9ad0a5; }
+.job-status-running { color: #ffd57a; }
+.job-status-error { color: var(--accent); }
+.job-status-queued { color: var(--muted); }
 #watch-list li:last-child { border-bottom: none; }
 #watch-list .remove {
   background: none;

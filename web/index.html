@@ -19,6 +19,7 @@
   <main>
     <section class="panel">
       <h2>Run a scan</h2>
+      <div id="capability-status"></div>
       <form id="scan-form">
         <div class="row">
           <label>username<input name="username" required placeholder="alice" /></label>
@@ -41,14 +42,63 @@
         <div class="row">
           <label class="inline"><input type="checkbox" name="stream" checked /> live progress</label>
         </div>
+        <div id="scan-case-target"></div>
         <button type="submit">Scan</button>
       </form>
       <div id="scan-status"></div>
       <div id="scan-progress">
         <div id="scan-progress-bar"></div>
       </div>
+      <div id="investigator-summary" class="brief-panel">
+        <div id="brief-headline"></div>
+        <div id="brief-metrics">
+          <div class="metric-pill">
+            <span>Priority</span>
+            <strong id="brief-priority-score">0/100</strong>
+          </div>
+          <div class="metric-pill">
+            <span>Confidence</span>
+            <strong id="brief-confidence-band">low</strong>
+          </div>
+        </div>
+        <div class="brief-grid">
+          <div class="brief-card">
+            <h3>Overview</h3>
+            <ul id="brief-overview"></ul>
+          </div>
+          <div class="brief-card">
+            <h3>Risk flags</h3>
+            <ul id="brief-risks"></ul>
+          </div>
+          <div class="brief-card">
+            <h3>Next steps</h3>
+            <ul id="brief-next-steps"></ul>
+          </div>
+          <div class="brief-card brief-card-full">
+            <h3>Actions by severity</h3>
+            <div id="brief-actions-by-severity"></div>
+          </div>
+        </div>
+      </div>
       <ul id="scan-log"></ul>
       <pre id="scan-output"></pre>
+    </section>
+
+    <section class="panel">
+      <h2>Recent jobs</h2>
+      <div id="job-status"></div>
+      <ul id="job-list"></ul>
+    </section>
+
+    <section class="panel panel-history">
+      <h2>History & diff</h2>
+      <form id="history-form" class="row">
+        <input name="username" placeholder="username" required />
+        <button type="submit">Load history</button>
+      </form>
+      <div id="history-status"></div>
+      <div id="history-diff"></div>
+      <ul id="history-list"></ul>
     </section>
 
     <section class="panel panel-graph">

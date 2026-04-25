@@ -12,7 +12,7 @@ pytest.importorskip("httpx")
 
 import httpx  # noqa: E402
 
-from core import api, auth, cases, watchlist  # noqa: E402
+from core import api, auth, cases, history, watchlist  # noqa: E402
 from core.api import server as api_server  # noqa: E402
 from core.models import PlatformResult, ScanResult  # noqa: E402
 
@@ -84,6 +84,14 @@ def client(tmp_path: Path, monkeypatch):
         auth.create_user, auth.get_user, auth.list_users, auth.authenticate,
     ):
         monkeypatch.setitem(fn.__kwdefaults__, "db_path", users_db)
+    # History DB isolated to tmp as well.
+    hist_db = tmp_path / "history.sqlite3"
+    monkeypatch.setattr(history, "DEFAULT_DB_PATH", hist_db)
+    for fn in (
+        history.save_scan, history.update_scan_payload, history.list_scans,
+        history.get_latest, history.get_scan,
+    ):
+        monkeypatch.setitem(fn.__kwdefaults__, "db_path", hist_db)
     # Pin the JWT secret so tokens are deterministic across the test.
     monkeypatch.setenv("OSINT_AUTH_SECRET", "test-secret")
     # Make sure no stray env var forces auth on.
@@ -123,6 +131,12 @@ def test_scan_endpoint_returns_payload(client: TestClient) -> None:
     data = r.json()
     assert data["username"] == "alice"
     assert any(p["exists"] for p in data["platforms"])
+    assert data["schema_version"]
+    assert "capabilities" in data
+    assert "warnings" in data
+    assert data["investigator_summary"]["headline"]
+    assert "priority_score" in data["investigator_summary"]
+    assert "confidence_band" in data["investigator_summary"]
 
 
 def test_scan_rejects_empty_username(client: TestClient) -> None:
@@ -171,6 +185,18 @@ def test_history_endpoints_missing_user(client: TestClient, monkeypatch) -> None
 
     r = client.get("/history/ghost/diff")
     assert r.status_code == 404
+
+
+def test_history_scan_returns_saved_payload(client: TestClient) -> None:
+    scan_id = history.save_scan(
+        {"username": "alice", "found_count": 1, "platforms": [{"platform": "GitHub", "exists": True}]},
+        ts=1000,
+    )
+    r = client.get(f"/history/scan/{scan_id}")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["id"] == scan_id
+    assert data["payload"]["username"] == "alice"
 
 
 def test_is_available_true_when_deps_installed() -> None:
@@ -234,6 +260,63 @@ async def test_scan_stream_emits_events(client: TestClient) -> None:
     # At least the terminal result event must arrive.
     assert "\"kind\": \"result\"" in text
     assert "eve" in text
+
+
+def test_capabilities_endpoint_returns_map(client: TestClient) -> None:
+    r = client.get("/capabilities")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["schema_version"]
+    assert "capabilities" in data
+    assert "api" in data["capabilities"]
+
+
+@pytest.mark.asyncio
+async def test_scan_job_lifecycle_returns_result_payload(client: TestClient) -> None:
+    transport = httpx.ASGITransport(app=client.app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
+        created = await ac.post(
+            "/scan-jobs",
+            json={"username": "alice", "save_history": False},
+        )
+        assert created.status_code == 202
+        job_id = created.json()["id"]
+
+        for _ in range(20):
+            detail = await ac.get(f"/scan-jobs/{job_id}")
+            assert detail.status_code == 200
+            data = detail.json()
+            if data["status"] == "completed":
+                assert data["result"]["username"] == "alice"
+                assert data["result"]["schema_version"]
+                break
+            await asyncio.sleep(0)
+        else:
+            pytest.fail("scan job did not complete in time")
+
+        result = await ac.get(f"/scan-jobs/{job_id}/result")
+        assert result.status_code == 200
+        assert result.json()["username"] == "alice"
+
+
+@pytest.mark.asyncio
+async def test_scan_job_events_stream_result(client: TestClient) -> None:
+    transport = httpx.ASGITransport(app=client.app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
+        created = await ac.post(
+            "/scan-jobs",
+            json={"username": "mallory", "save_history": False},
+        )
+        job_id = created.json()["id"]
+        async with ac.stream(
+            "GET",
+            f"/scan-jobs/{job_id}/events",
+        ) as r:
+            assert r.status_code == 200
+            body = b"".join([chunk async for chunk in r.aiter_bytes()])
+    text = body.decode()
+    assert "\"kind\": \"result\"" in text
+    assert "mallory" in text
 
 
 def test_graph_404_when_no_history(client: TestClient, monkeypatch) -> None:
@@ -571,6 +654,30 @@ def test_cases_delete_note_and_bookmark(client: TestClient) -> None:
     assert client.delete(f"/cases/bookmarks/{bm_id}").status_code == 200
     assert client.delete(f"/cases/notes/{note_id}").status_code == 404
     assert client.delete(f"/cases/bookmarks/{bm_id}").status_code == 404
+
+
+def test_cases_link_existing_scan(client: TestClient) -> None:
+    case_id = client.post("/cases", json={"name": "op", "description": ""}).json()["id"]
+    scan_id = history.save_scan(
+        {
+            "username": "alice",
+            "found_count": 1,
+            "platforms": [{"platform": "GitHub", "exists": True}],
+        },
+        ts=1000,
+    )
+    r = client.post(f"/cases/{case_id}/scans", json={"scan_id": scan_id})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["target_type"] == "scan"
+    assert data["scan_id"] == scan_id
+    assert data["scan"]["username"] == "alice"
+
+
+def test_cases_link_existing_scan_404_when_missing(client: TestClient) -> None:
+    case_id = client.post("/cases", json={"name": "op", "description": ""}).json()["id"]
+    r = client.post(f"/cases/{case_id}/scans", json={"scan_id": 999})
+    assert r.status_code == 404
 
 
 def test_auth_login_success_and_token_shape(client: TestClient) -> None:

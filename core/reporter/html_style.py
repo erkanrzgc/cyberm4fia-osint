@@ -46,6 +46,7 @@ h3 { color: #ffb5a0; margin-bottom: 0.75rem; }
 .summary span { color: var(--accent); font-weight: bold; }
 .grid { display: grid; gap: 1rem; }
 .grid-2 { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.grid-3 { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
 .card {
     background: rgba(17, 17, 17, 0.88);
     border: 1px solid var(--line);
@@ -66,6 +67,56 @@ h3 { color: #ffb5a0; margin-bottom: 0.75rem; }
     border: 1px solid var(--line);
     color: var(--text);
 }
+.brief-headline {
+    padding: 0.9rem 1rem;
+    border: 1px solid var(--line-strong);
+    border-radius: 10px;
+    background: rgba(17, 17, 17, 0.88);
+    color: var(--text);
+    margin-bottom: 1rem;
+    font-weight: bold;
+}
+.brief-metrics {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+.metric-chip {
+    min-width: 180px;
+    padding: 0.75rem 0.9rem;
+    border-radius: 10px;
+    border: 1px solid var(--line-strong);
+    background: rgba(17, 17, 17, 0.88);
+}
+.metric-chip span {
+    display: block;
+    color: var(--muted);
+    font-size: 0.82rem;
+    margin-bottom: 0.2rem;
+}
+.metric-chip strong {
+    color: var(--accent);
+    text-transform: capitalize;
+}
+.risk-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+.risk-item {
+    border-left: 3px solid var(--line-strong);
+    padding: 0.5rem 0.75rem;
+    margin: 0.5rem 0;
+    background: rgba(255, 255, 255, 0.02);
+}
+.risk-item strong {
+    display: block;
+    margin-bottom: 0.2rem;
+}
+.risk-high { border-left-color: #ff4d4d; }
+.risk-medium { border-left-color: #ffb36b; }
+.risk-low { border-left-color: #6cb7ff; }
 .muted { color: var(--muted); }
 table { width: 100%; border-collapse: collapse; margin: 1rem 0; background: rgba(17, 17, 17, 0.86); }
 th {

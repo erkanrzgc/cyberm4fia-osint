@@ -22,15 +22,17 @@ from pydantic import BaseModel, Field
 
 from core import auth, cases, watchlist
 from core.api.cytoscape import payload_to_cytoscape
+from core.api.jobs import ScanJobStore
+from core.capabilities import collect_capabilities
 from core.compare import compare_payloads
 from core.config import ScanConfig
 from core.correlation import correlate
 from core.engine import run_scan
-from core.history import diff_entries, get_latest, get_scan, list_scans, save_scan
+from core.history import diff_entries, get_latest, get_scan, list_scans
 from core.http_client import HTTPClient
 from core.logging_setup import get_logger
 from core.progress import ProgressEmitter, set_emitter
-from core.search import index_scan
+from core.scan_service import SCAN_PAYLOAD_SCHEMA_VERSION, complete_scan_result
 from core.search import search as history_search
 from core.social_graph import compute_overlap, fetch_github_neighbors
 
@@ -38,7 +40,7 @@ log = get_logger(__name__)
 
 _WEB_DIR = Path(__file__).resolve().parent.parent.parent / "web"
 
-_PUBLIC_PATHS = frozenset({"/", "/health", "/auth/login", "/docs",
+_PUBLIC_PATHS = frozenset({"/", "/health", "/capabilities", "/auth/login", "/docs",
                            "/openapi.json", "/redoc"})
 
 
@@ -87,6 +89,7 @@ class ScanRequest(BaseModel):
     categories: list[str] | None = None
     fp_threshold: float = 0.45
     save_history: bool = True
+    case_id: int | None = None
 
 
 class WatchlistAddRequest(BaseModel):
@@ -120,6 +123,11 @@ class CaseBookmarkRequest(BaseModel):
     scan_id: int | None = None
 
 
+class CaseLinkScanRequest(BaseModel):
+    scan_id: int = Field(..., ge=1)
+    label: str = ""
+
+
 class LoginRequest(BaseModel):
     username: str = Field(..., min_length=1)
     password: str = Field(..., min_length=1)
@@ -149,6 +157,19 @@ def _cfg_from_request(req: ScanRequest) -> ScanConfig:
     )
 
 
+async def _execute_api_scan(req: ScanRequest) -> dict[str, Any]:
+    cfg = _cfg_from_request(req)
+    result = await run_scan(cfg)
+    completed = complete_scan_result(
+        result,
+        cfg,
+        save_history=req.save_history,
+        case_id=req.case_id,
+        mark_watchlist=True,
+    )
+    return completed.payload
+
+
 # ── App factory ──────────────────────────────────────────────────────
 
 
@@ -160,10 +181,19 @@ def build_app() -> FastAPI:
         description="REST surface around the OSINT scan engine.",
         dependencies=dependencies,
     )
+    app.state.scan_jobs = ScanJobStore(runner=run_scan)
 
     @app.get("/health")
     def health() -> dict[str, Any]:
         return {"status": "ok", "ts": int(time.time())}
+
+    @app.get("/capabilities")
+    def capabilities() -> dict[str, Any]:
+        return {
+            "schema_version": SCAN_PAYLOAD_SCHEMA_VERSION,
+            "generated_at": int(time.time()),
+            "capabilities": collect_capabilities(),
+        }
 
     @app.post("/auth/login")
     def auth_login(req: LoginRequest) -> dict[str, Any]:
@@ -209,23 +239,11 @@ def build_app() -> FastAPI:
 
     @app.post("/scan")
     async def scan(req: ScanRequest) -> dict[str, Any]:
-        cfg = _cfg_from_request(req)
         try:
-            result = await run_scan(cfg)
+            return await _execute_api_scan(req)
         except Exception as exc:
             log.exception("scan failed for %s", req.username)
             raise HTTPException(status_code=500, detail=str(exc)) from exc
-
-        payload: dict[str, Any] = result.to_dict()
-        if req.save_history:
-            try:
-                scan_id = save_scan(payload, ts=int(time.time()))
-            except (OSError, ValueError) as exc:
-                log.warning("history: save failed: %s", exc)
-            else:
-                if scan_id > 0:
-                    index_scan(scan_id, payload)
-        return payload
 
     @app.post("/scan/stream")
     async def scan_stream(req: ScanRequest) -> StreamingResponse:
@@ -244,16 +262,14 @@ def build_app() -> FastAPI:
                         log.exception("streamed scan failed for %s", req.username)
                         emitter.emit_error(str(exc))
                         return
-                    payload: dict[str, Any] = result.to_dict()
-                    if req.save_history:
-                        try:
-                            scan_id = save_scan(payload, ts=int(time.time()))
-                        except (OSError, ValueError) as exc:
-                            log.warning("history: save failed: %s", exc)
-                        else:
-                            if scan_id > 0:
-                                index_scan(scan_id, payload)
-                    emitter.emit_result(payload)
+                    completed = complete_scan_result(
+                        result,
+                        cfg,
+                        save_history=req.save_history,
+                        case_id=req.case_id,
+                        mark_watchlist=True,
+                    )
+                    emitter.emit_result(completed.payload)
                 finally:
                     set_emitter(None)
                     emitter.close()
@@ -281,6 +297,67 @@ def build_app() -> FastAPI:
                 with contextlib.suppress(asyncio.CancelledError):
                     await task
                 emitter.unsubscribe(queue)
+
+        return StreamingResponse(_stream(), media_type="text/event-stream")
+
+    @app.post("/scan-jobs", status_code=202)
+    async def create_scan_job(req: ScanRequest, request: Request) -> dict[str, Any]:
+        cfg = _cfg_from_request(req)
+        store: ScanJobStore = request.app.state.scan_jobs
+        job = store.create_job(
+            cfg,
+            req.model_dump(),
+            save_history=req.save_history,
+            case_id=req.case_id,
+        )
+        return job.to_dict()
+
+    @app.get("/scan-jobs")
+    def list_scan_jobs(request: Request, limit: int = 20) -> dict[str, Any]:
+        store: ScanJobStore = request.app.state.scan_jobs
+        jobs = store.list_jobs(limit=max(1, min(int(limit), 100)))
+        return {
+            "count": len(jobs),
+            "jobs": [job.to_dict() for job in jobs],
+        }
+
+    @app.get("/scan-jobs/{job_id}")
+    def get_scan_job(job_id: str, request: Request) -> dict[str, Any]:
+        store: ScanJobStore = request.app.state.scan_jobs
+        job = store.get(job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="scan job not found")
+        return job.to_dict(include_result=True)
+
+    @app.get("/scan-jobs/{job_id}/result")
+    def get_scan_job_result(job_id: str, request: Request) -> dict[str, Any]:
+        store: ScanJobStore = request.app.state.scan_jobs
+        job = store.get(job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="scan job not found")
+        if job.result is None:
+            raise HTTPException(status_code=409, detail=f"scan job is still {job.status}")
+        return job.result
+
+    @app.get("/scan-jobs/{job_id}/events")
+    async def stream_scan_job_events(job_id: str, request: Request) -> StreamingResponse:
+        store: ScanJobStore = request.app.state.scan_jobs
+        job = store.get(job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="scan job not found")
+
+        async def _stream() -> AsyncIterator[bytes]:
+            queue, backlog_size = job.subscribe()
+            try:
+                for event in job.events[:backlog_size]:
+                    yield f"data: {json.dumps(event)}\n\n".encode()
+                while True:
+                    item = await queue.get()
+                    if item is None:
+                        break
+                    yield f"data: {json.dumps(item)}\n\n".encode()
+            finally:
+                job.unsubscribe(queue)
 
         return StreamingResponse(_stream(), media_type="text/event-stream")
 
@@ -456,6 +533,19 @@ def build_app() -> FastAPI:
             "payload": entry.payload,
         }
 
+    @app.get("/history/scan/{scan_id}")
+    def history_scan(scan_id: int) -> dict[str, Any]:
+        entry = get_scan(scan_id)
+        if entry is None:
+            raise HTTPException(status_code=404, detail="scan not found")
+        return {
+            "id": entry.id,
+            "username": entry.username,
+            "ts": entry.ts,
+            "found_count": entry.found_count,
+            "payload": entry.payload,
+        }
+
     @app.get("/history/{username}/diff")
     def history_diff(username: str) -> dict[str, Any]:
         current = get_latest(username)
@@ -571,6 +661,32 @@ def build_app() -> FastAPI:
             status = 404 if "does not exist" in str(exc) else 400
             raise HTTPException(status_code=status, detail=str(exc)) from exc
         return bm.to_dict()
+
+    @app.post("/cases/{case_id}/scans")
+    def cases_link_scan(case_id: int, req: CaseLinkScanRequest) -> dict[str, Any]:
+        entry = get_scan(req.scan_id)
+        if entry is None:
+            raise HTTPException(status_code=404, detail="scan not found")
+        try:
+            bm = cases.add_bookmark(
+                case_id,
+                target_type="scan",
+                target_value=entry.username,
+                label=req.label or f"Scan #{entry.id} for {entry.username}",
+                scan_id=entry.id,
+            )
+        except ValueError as exc:
+            status = 404 if "does not exist" in str(exc) else 400
+            raise HTTPException(status_code=status, detail=str(exc)) from exc
+        return {
+            **bm.to_dict(),
+            "scan": {
+                "id": entry.id,
+                "username": entry.username,
+                "ts": entry.ts,
+                "found_count": entry.found_count,
+            },
+        }
 
     @app.delete("/cases/bookmarks/{bookmark_id}")
     def cases_delete_bookmark(bookmark_id: int) -> dict[str, Any]:

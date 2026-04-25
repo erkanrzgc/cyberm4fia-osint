@@ -4,6 +4,22 @@ const scanOutput = document.getElementById("scan-output");
 const scanLog = document.getElementById("scan-log");
 const scanProgress = document.getElementById("scan-progress");
 const scanProgressBar = document.getElementById("scan-progress-bar");
+const capabilityStatus = document.getElementById("capability-status");
+const jobStatus = document.getElementById("job-status");
+const jobList = document.getElementById("job-list");
+const investigatorSummary = document.getElementById("investigator-summary");
+const briefHeadline = document.getElementById("brief-headline");
+const briefPriorityScore = document.getElementById("brief-priority-score");
+const briefConfidenceBand = document.getElementById("brief-confidence-band");
+const briefOverview = document.getElementById("brief-overview");
+const briefRisks = document.getElementById("brief-risks");
+const briefNextSteps = document.getElementById("brief-next-steps");
+const briefActionsBySeverity = document.getElementById("brief-actions-by-severity");
+const scanCaseTarget = document.getElementById("scan-case-target");
+const historyForm = document.getElementById("history-form");
+const historyStatus = document.getElementById("history-status");
+const historyDiff = document.getElementById("history-diff");
+const historyList = document.getElementById("history-list");
 const watchForm = document.getElementById("watch-form");
 const watchList = document.getElementById("watch-list");
 const graphForm = document.getElementById("graph-form");
@@ -54,7 +70,17 @@ function buildFormBody() {
   };
   const cats = (fd.get("categories") || "").toString().trim();
   if (cats) body.categories = cats.split(",").map((s) => s.trim()).filter(Boolean);
+  if (activeCaseId) body.case_id = activeCaseId;
   return body;
+}
+
+function updateScanCaseTarget() {
+  if (!scanCaseTarget) return;
+  if (!activeCaseId) {
+    scanCaseTarget.textContent = "no active case selected";
+    return;
+  }
+  scanCaseTarget.textContent = "new scans will be linked to case #" + activeCaseId;
 }
 
 async function refreshWatchlist() {
@@ -93,16 +119,85 @@ function logLine(event) {
   scanLog.scrollTop = scanLog.scrollHeight;
 }
 
+function renderBriefList(target, items, formatter) {
+  target.innerHTML = "";
+  if (!items || items.length === 0) {
+    const li = document.createElement("li");
+    li.className = "empty";
+    li.textContent = "none";
+    target.appendChild(li);
+    return;
+  }
+  for (const item of items) {
+    const li = document.createElement("li");
+    formatter(li, item);
+    target.appendChild(li);
+  }
+}
+
+function renderInvestigatorSummary(payload) {
+  const brief = payload && payload.investigator_summary;
+  if (!brief) {
+    investigatorSummary.classList.remove("show");
+    return;
+  }
+  investigatorSummary.classList.add("show");
+  briefHeadline.textContent = brief.headline || "no analyst headline";
+  briefPriorityScore.textContent = (brief.priority_score || 0) + "/100";
+  briefConfidenceBand.textContent = (brief.confidence_band || "low").replaceAll("_", " ");
+  renderBriefList(briefOverview, brief.overview || [], (li, item) => {
+    li.textContent = item;
+  });
+  renderBriefList(briefRisks, brief.risk_flags || [], (li, item) => {
+    const severity = (item.severity || "low").toLowerCase();
+    li.className = "risk-" + severity;
+    li.innerHTML =
+      "<strong>" + item.title + "</strong>" +
+      "<span>" + (item.detail || "") + "</span>";
+  });
+  renderBriefList(briefNextSteps, brief.next_steps || [], (li, item) => {
+    li.textContent = item;
+  });
+  briefActionsBySeverity.innerHTML = "";
+  const actionLabels = {
+    high: "Immediate",
+    medium: "Follow-up",
+    low: "Background",
+  };
+  const actions = brief.recommended_actions_by_severity || {};
+  for (const key of ["high", "medium", "low"]) {
+    const items = actions[key] || [];
+    if (!items.length) continue;
+    const block = document.createElement("div");
+    block.className = "brief-action-group";
+    const heading = document.createElement("h4");
+    heading.textContent = actionLabels[key];
+    block.appendChild(heading);
+    const list = document.createElement("ul");
+    renderBriefList(list, items, (li, item) => {
+      li.textContent = item;
+    });
+    block.appendChild(list);
+    briefActionsBySeverity.appendChild(block);
+  }
+}
+
 async function streamScan(body) {
   scanLog.innerHTML = "";
   scanProgress.classList.add("active");
   scanProgressBar.style.width = "2%";
-
-  const r = await fetch("/scan/stream", {
+  const createRes = await fetch("/scan-jobs", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+  if (!createRes.ok) throw new Error("HTTP " + createRes.status);
+  const created = await createRes.json();
+  const jobId = created.id;
+  scanStatus.textContent = "job " + jobId + " queued";
+  refreshJobs();
+
+  const r = await fetch("/scan-jobs/" + encodeURIComponent(jobId) + "/events");
   if (!r.ok || !r.body) throw new Error("HTTP " + r.status);
 
   const reader = r.body.getReader();
@@ -111,6 +206,7 @@ async function streamScan(body) {
   let totalPhases = 15; // approximate, engine has ~15 phases
   let doneCount = 0;
   let finalPayload = null;
+  let lastStatus = "running";
 
   while (true) {
     const { value, done } = await reader.read();
@@ -126,6 +222,9 @@ async function streamScan(body) {
       let event;
       try { event = JSON.parse(payload); } catch { continue; }
       logLine(event);
+      if (event.kind === "job_finished" && event.data) {
+        lastStatus = event.data.status || lastStatus;
+      }
       if (event.kind === "phase_end") {
         doneCount += 1;
         scanProgressBar.style.width = Math.min(95, (doneCount / totalPhases) * 100) + "%";
@@ -137,7 +236,32 @@ async function streamScan(body) {
   }
   scanProgressBar.style.width = "100%";
   setTimeout(() => scanProgress.classList.remove("active"), 500);
+  refreshJobs();
+  if (!finalPayload && lastStatus !== "completed") {
+    throw new Error("job " + jobId + " finished with status " + lastStatus);
+  }
   return finalPayload;
+}
+
+async function pollJob(jobId) {
+  scanProgress.classList.add("active");
+  scanProgressBar.style.width = "8%";
+  while (true) {
+    const r = await fetch("/scan-jobs/" + encodeURIComponent(jobId));
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const job = await r.json();
+    if (job.status === "completed" && job.result) {
+      scanProgressBar.style.width = "100%";
+      setTimeout(() => scanProgress.classList.remove("active"), 500);
+      refreshJobs();
+      return job.result;
+    }
+    if (job.status === "error") {
+      throw new Error(job.error || "job failed");
+    }
+    scanProgressBar.style.width = Math.min(92, Number(scanProgressBar.style.width.replace("%", "") || "8") + 8) + "%";
+    await new Promise((resolve) => setTimeout(resolve, 400));
+  }
 }
 
 scanForm.addEventListener("submit", async (ev) => {
@@ -152,24 +276,91 @@ scanForm.addEventListener("submit", async (ev) => {
     if (stream) {
       data = await streamScan(body);
     } else {
-      const r = await fetch("/scan", {
+      const createRes = await fetch("/scan-jobs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (!r.ok) { scanStatus.textContent = "error: HTTP " + r.status; return; }
-      data = await r.json();
+      if (!createRes.ok) { scanStatus.textContent = "error: HTTP " + createRes.status; return; }
+      const created = await createRes.json();
+      scanStatus.textContent = "job " + created.id + " queued";
+      refreshJobs();
+      data = await pollJob(created.id);
     }
     if (!data) { scanStatus.textContent = "no result"; return; }
     const found = (data.platforms || []).filter((p) => p.exists).length;
-    scanStatus.textContent = "done — " + found + " platforms matched";
+    const warnings = data.warnings || [];
+    scanStatus.textContent = "done — " + found + " platforms matched" +
+      (data.scan_id ? " · scan #" + data.scan_id : "") +
+      (warnings.length ? " · " + warnings.length + " warning(s)" : "");
+    renderInvestigatorSummary(data);
     scanOutput.textContent = JSON.stringify(data, null, 2);
     // Auto-load graph for this username.
     loadGraph(body.username);
+    refreshHistory(body.username);
   } catch (err) {
     scanStatus.textContent = "network error: " + err.message;
   }
 });
+
+async function refreshCapabilities() {
+  try {
+    const r = await fetch("/capabilities");
+    if (!r.ok) return;
+    const data = await r.json();
+    const caps = data.capabilities || {};
+    const ready = Object.entries(caps)
+      .filter(([, meta]) => meta && meta.ready)
+      .map(([name]) => name);
+    const degraded = Object.entries(caps)
+      .filter(([, meta]) => meta && meta.available && !meta.ready)
+      .map(([name]) => name);
+    capabilityStatus.textContent =
+      "schema " + data.schema_version +
+      " · ready: " + ready.slice(0, 6).join(", ") +
+      (degraded.length ? " · partial: " + degraded.slice(0, 4).join(", ") : "");
+  } catch (err) {
+    capabilityStatus.textContent = "capabilities fetch error: " + err.message;
+  }
+}
+
+function renderJobItem(job) {
+  const li = document.createElement("li");
+  const left = document.createElement("span");
+  left.textContent = "#" + job.id.slice(0, 8) + "  " + job.username;
+  const right = document.createElement("span");
+  right.textContent = job.status + (job.scan_id ? " · scan #" + job.scan_id : "");
+  right.className = "job-status-" + job.status;
+  li.appendChild(left);
+  li.appendChild(right);
+  li.addEventListener("click", async () => {
+    if (!job.scan_id) return;
+    scanStatus.textContent = "loaded scan #" + job.scan_id + " from job " + job.id.slice(0, 8);
+    const r = await fetch("/scan-jobs/" + encodeURIComponent(job.id) + "/result");
+    if (!r.ok) return;
+    const data = await r.json();
+    renderInvestigatorSummary(data);
+    scanOutput.textContent = JSON.stringify(data, null, 2);
+    if (data.username) refreshHistory(data.username);
+  });
+  return li;
+}
+
+async function refreshJobs() {
+  try {
+    const r = await fetch("/scan-jobs?limit=8");
+    if (!r.ok) return;
+    const data = await r.json();
+    jobList.innerHTML = "";
+    const jobs = data.jobs || [];
+    jobStatus.textContent = jobs.length ? jobs.length + " recent jobs" : "no jobs yet";
+    for (const job of jobs) {
+      jobList.appendChild(renderJobItem(job));
+    }
+  } catch (err) {
+    jobStatus.textContent = "jobs fetch error: " + err.message;
+  }
+}
 
 watchForm.addEventListener("submit", async (ev) => {
   ev.preventDefault();
@@ -586,6 +777,7 @@ const caseStatus = document.getElementById("case-status");
 const caseListEl = document.getElementById("case-list");
 const caseDetail = document.getElementById("case-detail");
 let activeCaseId = null;
+let currentHistoryUsername = "";
 
 function fmtTs(ts) {
   if (!ts) return "";
@@ -600,6 +792,8 @@ async function refreshCases() {
     const data = await res.json();
     caseListEl.innerHTML = "";
     if (!data.entries || data.entries.length === 0) {
+      activeCaseId = null;
+      updateScanCaseTarget();
       const li = document.createElement("li");
       li.className = "empty";
       li.style.cursor = "default";
@@ -629,7 +823,9 @@ async function refreshCases() {
 
 async function loadCaseDetail(caseId) {
   activeCaseId = caseId;
+  updateScanCaseTarget();
   await refreshCases();
+  if (currentHistoryUsername) refreshHistory(currentHistoryUsername);
   try {
     const res = await fetch("/cases/" + caseId);
     if (!res.ok) {
@@ -668,13 +864,14 @@ async function loadCaseDetail(caseId) {
     const delBtn = document.createElement("button");
     delBtn.type = "button";
     delBtn.textContent = "Delete";
-    delBtn.addEventListener("click", async () => {
-      if (!confirm("Delete case #" + caseId + "?")) return;
-      await fetch("/cases/" + caseId, { method: "DELETE" });
-      activeCaseId = null;
-      caseDetail.classList.remove("show");
-      refreshCases();
-    });
+      delBtn.addEventListener("click", async () => {
+        if (!confirm("Delete case #" + caseId + "?")) return;
+        await fetch("/cases/" + caseId, { method: "DELETE" });
+        activeCaseId = null;
+        updateScanCaseTarget();
+        caseDetail.classList.remove("show");
+        refreshCases();
+      });
     actions.appendChild(delBtn);
     caseDetail.appendChild(actions);
 
@@ -820,8 +1017,116 @@ caseCreateForm.addEventListener("submit", async (ev) => {
   }
 });
 
+function renderHistoryDiff(data) {
+  historyDiff.innerHTML = "";
+  const added = data.added || [];
+  const removed = data.removed || [];
+  if (data.message && !added.length && !removed.length) {
+    historyDiff.textContent = data.message;
+    return;
+  }
+  const parts = [];
+  if (added.length) parts.push("+" + added.join(", "));
+  if (removed.length) parts.push("-" + removed.join(", "));
+  historyDiff.textContent = parts.join("  ·  ") || "no changes";
+}
+
+async function linkHistoryScanToCase(scanId, username) {
+  if (!activeCaseId) {
+    historyStatus.textContent = "select a case first";
+    return;
+  }
+  const res = await fetch("/cases/" + activeCaseId + "/scans", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scan_id: scanId }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    historyStatus.textContent = "link error: " + (err.detail || res.status);
+    return;
+  }
+  historyStatus.textContent = "linked scan #" + scanId + " to case #" + activeCaseId;
+  loadCaseDetail(activeCaseId);
+  refreshHistory(username);
+}
+
+function renderHistoryEntry(entry, username) {
+  const li = document.createElement("li");
+  const left = document.createElement("span");
+  left.textContent = "#" + entry.id + "  " + fmtTs(entry.ts) + "  ·  " + entry.found_count + " found";
+  li.appendChild(left);
+  const actions = document.createElement("div");
+  actions.className = "history-actions";
+
+  const loadBtn = document.createElement("button");
+  loadBtn.type = "button";
+  loadBtn.textContent = "load";
+  loadBtn.addEventListener("click", async () => {
+    const res = await fetch("/history/scan/" + entry.id);
+    if (!res.ok) return;
+    const data = await res.json();
+    renderInvestigatorSummary(data.payload || {});
+    scanOutput.textContent = JSON.stringify(data.payload, null, 2);
+    scanStatus.textContent = "loaded history scan #" + entry.id;
+  });
+  actions.appendChild(loadBtn);
+
+  const linkBtn = document.createElement("button");
+  linkBtn.type = "button";
+  linkBtn.textContent = "link";
+  linkBtn.disabled = !activeCaseId;
+  linkBtn.addEventListener("click", () => linkHistoryScanToCase(entry.id, username));
+  actions.appendChild(linkBtn);
+
+  li.appendChild(actions);
+  return li;
+}
+
+async function refreshHistory(username) {
+  const clean = (username || "").trim();
+  if (!clean) return;
+  currentHistoryUsername = clean;
+  historyStatus.textContent = "loading history for " + clean + "...";
+  historyList.innerHTML = "";
+  historyDiff.textContent = "";
+  try {
+    const [listRes, diffRes] = await Promise.all([
+      fetch("/history/" + encodeURIComponent(clean)),
+      fetch("/history/" + encodeURIComponent(clean) + "/diff"),
+    ]);
+    if (!listRes.ok) {
+      historyStatus.textContent = "error: HTTP " + listRes.status;
+      return;
+    }
+    const listData = await listRes.json();
+    historyStatus.textContent = listData.count + " saved scan(s) for " + clean;
+    for (const entry of listData.entries || []) {
+      historyList.appendChild(renderHistoryEntry(entry, clean));
+    }
+    if (diffRes.ok) {
+      renderHistoryDiff(await diffRes.json());
+    } else if (diffRes.status === 404) {
+      historyDiff.textContent = "no previous scan";
+    }
+  } catch (err) {
+    historyStatus.textContent = "history error: " + err.message;
+  }
+}
+
+historyForm.addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  const fd = new FormData(historyForm);
+  const username = (fd.get("username") || "").toString().trim();
+  if (!username) return;
+  refreshHistory(username);
+});
+
 refreshCases();
 refreshWatchlist();
+refreshCapabilities();
+refreshJobs();
+updateScanCaseTarget();
 
 const searchForm = document.getElementById("search-form");
 const searchStatus = document.getElementById("search-status");

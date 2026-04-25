@@ -42,6 +42,7 @@ dmypy.json
 # Environments / secrets
 .env
 .env.*
+!.env.example
 *.pem
 *.key
 secrets.json

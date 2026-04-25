@@ -751,6 +751,48 @@ async def _phase_crypto(
     result.crypto_intel = list(intel)
 
 
+async def _phase_recon(
+    client: HTTPClient,
+    cfg: ScanConfig,
+    result: ScanResult,
+) -> None:
+    """Red-team corporate recon: email patterns + GitHub org + subdomain enrichment.
+
+    Runs only when ``cfg.redteam_domain`` is set. Fans out the three
+    independent sources concurrently and merges results into ``ScanResult``.
+    Each source swallows its own errors; failure of one does not abort the
+    others.
+    """
+    if not cfg.redteam_domain:
+        return
+    from modules.dns_lookup import enumerate_subdomains
+    from modules.recon import email_patterns, github_org, subdomains_extra
+
+    domain = cfg.redteam_domain.strip().lower().lstrip("@")
+    org = (cfg.redteam_github_org or domain.split(".", 1)[0]).strip()
+
+    names: list[str] = []
+    if cfg.redteam_names_file:
+        try:
+            with open(cfg.redteam_names_file, encoding="utf-8") as fh:
+                names = [line.strip() for line in fh if line.strip()]
+        except OSError:
+            names = []
+
+    seed_subs, committers = await asyncio.gather(
+        enumerate_subdomains(client, domain),
+        github_org.scan_org(client, org),
+    )
+    subs = await subdomains_extra.enrich_subdomains(
+        client, domain, existing=seed_subs
+    )
+    candidates = email_patterns.generate_bulk(names, domain) if names else []
+
+    result.email_candidates = [c.to_dict() for c in candidates]
+    result.github_committers = [g.to_dict() for g in committers]
+    result.recon_subdomains = [s.to_dict() for s in subs]
+
+
 async def _phase_geocode(cfg: ScanConfig, result: ScanResult) -> None:
     """Resolve location strings found in profile data to lat/lng.
 
@@ -855,6 +897,16 @@ async def run_scan(cfg: ScanConfig) -> ScanResult:
         _emit("phase_start", phase="crypto")
         await _phase_crypto(client, cfg, result)
         _emit("phase_end", phase="crypto")
+
+        _emit("phase_start", phase="recon")
+        await _phase_recon(client, cfg, result)
+        _emit(
+            "phase_end",
+            phase="recon",
+            subdomains=len(result.recon_subdomains),
+            committers=len(result.github_committers),
+            candidates=len(result.email_candidates),
+        )
 
     _emit("phase_start", phase="cross_reference")
     _finalize_cross_reference(result)

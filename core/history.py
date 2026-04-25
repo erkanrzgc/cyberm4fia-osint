@@ -78,6 +78,38 @@ def save_scan(payload: dict, *, ts: int, db_path: Path = DEFAULT_DB_PATH) -> int
         conn.close()
 
 
+def update_scan_payload(
+    scan_id: int,
+    payload: dict,
+    *,
+    db_path: Path = DEFAULT_DB_PATH,
+) -> bool:
+    """Replace the stored JSON payload for an existing scan row."""
+    if scan_id <= 0:
+        return False
+    try:
+        conn = _connect(db_path)
+    except sqlite3.Error as exc:
+        log.warning("history: could not open db %s: %s", db_path, exc)
+        return False
+    try:
+        cursor = conn.execute(
+            "UPDATE scans SET found_count = ?, payload = ? WHERE id = ?",
+            (
+                int(payload.get("found_count", 0)),
+                json.dumps(payload, ensure_ascii=False),
+                scan_id,
+            ),
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+    except sqlite3.Error as exc:
+        log.warning("history: could not update scan %s in %s: %s", scan_id, db_path, exc)
+        return False
+    finally:
+        conn.close()
+
+
 def list_scans(
     username: str, *, limit: int = 20, db_path: Path = DEFAULT_DB_PATH
 ) -> list[HistoryEntry]:

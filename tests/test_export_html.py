@@ -74,6 +74,7 @@ def test_export_html_escapes_username_and_renders_sections(tmp_path):
     assert "&lt;script&gt;alert(1)&lt;/script&gt;" in html
     assert "<script>alert(1)</script>" not in html
     for section in (
+        "Investigator Brief",
         "Discovered Emails",
         "Profile Photo Matches",
         "Web Presence",
@@ -84,3 +85,8 @@ def test_export_html_escapes_username_and_renders_sections(tmp_path):
         "Confidence Score",
     ):
         assert section in html
+    assert "Risk Flags" in html
+    assert "Next Steps" in html
+    assert "Priority" in html
+    assert "Confidence" in html
+    assert "Recommended Actions By Severity" in html
