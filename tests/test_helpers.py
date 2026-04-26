@@ -1,5 +1,7 @@
 """Tests for utils/helpers.py pure functions."""
 
+import pytest
+
 from utils.helpers import (
     extract_emails_from_text,
     extract_urls_from_text,
@@ -22,6 +24,40 @@ class TestSanitizeUsername:
 
     def test_plain(self):
         assert sanitize_username("alice") == "alice"
+
+    def test_dotted_handle_preserved(self):
+        # Instagram/TikTok handles can contain dots — must not be mistaken for a domain.
+        assert sanitize_username("erkan.rzgc") == "erkan.rzgc"
+        assert sanitize_username("@john.doe") == "john.doe"
+
+    def test_https_github_url(self):
+        assert sanitize_username("https://github.com/erkanrzgc") == "erkanrzgc"
+
+    def test_http_twitter_url_with_query(self):
+        assert sanitize_username("http://twitter.com/erkanrzgc?ref=foo") == "erkanrzgc"
+
+    def test_url_without_scheme(self):
+        assert sanitize_username("github.com/erkanrzgc") == "erkanrzgc"
+
+    def test_www_prefix(self):
+        assert sanitize_username("www.instagram.com/erkan.rzgc") == "erkan.rzgc"
+
+    def test_linkedin_in_prefix_stripped(self):
+        assert sanitize_username("https://www.linkedin.com/in/erkanrzgc") == "erkanrzgc"
+
+    def test_at_path_prefix_stripped(self):
+        # tiktok.com/@user/ style
+        assert sanitize_username("https://tiktok.com/@erkanrzgc") == "erkanrzgc"
+
+    def test_empty_raises(self):
+        with pytest.raises(ValueError):
+            sanitize_username("")
+        with pytest.raises(ValueError):
+            sanitize_username("   ")
+
+    def test_url_without_handle_raises(self):
+        with pytest.raises(ValueError):
+            sanitize_username("https://github.com/")
 
 
 class TestMd5Hash:

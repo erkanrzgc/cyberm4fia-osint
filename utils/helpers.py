@@ -1,9 +1,69 @@
 import hashlib
 import re
+import sys
+from urllib.parse import urlparse
+
+# Common social-profile path prefixes that wrap the actual handle.
+# e.g. https://www.linkedin.com/in/erkanrzgc  →  erkanrzgc
+_PROFILE_PATH_PREFIXES = ("in", "u", "user", "users", "profile", "@")
 
 
 def sanitize_username(username: str) -> str:
-    return username.strip().lstrip("@")
+    """Normalize a CLI/MCP username argument.
+
+    Accepts either a bare handle (`alice`, `@alice`, `erkan.rzgc`) or a
+    profile URL (`https://github.com/erkanrzgc`, `twitter.com/erkanrzgc`).
+    URLs are detected only by explicit signals (`://`, leading `www.`, or
+    a `/` in the input) so dotted handles like `erkan.rzgc` are preserved.
+
+    Raises ValueError on empty/whitespace-only input or a URL with no
+    extractable handle (e.g. `https://github.com/`).
+    """
+    if not username or not username.strip():
+        raise ValueError("username is empty")
+
+    raw = username.strip()
+    looks_like_url = (
+        "://" in raw
+        or raw.lower().startswith("www.")
+        or "/" in raw
+    )
+
+    if looks_like_url:
+        handle = _extract_handle_from_url(raw)
+        if not handle:
+            raise ValueError(
+                f"could not extract a username from {username!r}. "
+                "Pass just the handle (e.g. 'erkanrzgc') instead of the full URL."
+            )
+        print(
+            f"[sanitize_username] interpreted {username!r} as URL → handle {handle!r}",
+            file=sys.stderr,
+        )
+        return handle.lstrip("@")
+
+    return raw.lstrip("@")
+
+
+def _extract_handle_from_url(raw: str) -> str:
+    """Pull the most likely handle out of a profile-style URL or path."""
+    candidate = raw if "://" in raw else f"https://{raw.lstrip('/')}"
+    try:
+        parsed = urlparse(candidate)
+    except ValueError:
+        return ""
+
+    path_parts = [p for p in parsed.path.split("/") if p]
+    if not path_parts:
+        return ""
+
+    # Skip leading prefixes like /in/, /user/, /@ until a real handle remains.
+    while path_parts and path_parts[0].lower().lstrip("@") in _PROFILE_PATH_PREFIXES:
+        path_parts.pop(0)
+
+    if not path_parts:
+        return ""
+    return path_parts[0].lstrip("@")
 
 
 def md5_hash(text: str) -> str:
