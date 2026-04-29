@@ -130,6 +130,8 @@ class ScanConfig:
     company_query: str | None = None
     company_limit: int = 5
     harvest_doc_urls: tuple[str, ...] = ()
+    intelx_term: str | None = None
+    intelx_limit: int = 50
 
     @classmethod
     def from_args(cls, args, username: str) -> ScanConfig:
@@ -231,6 +233,8 @@ class ScanConfig:
                 for u in (getattr(args, "harvest_doc", None) or [])
                 if u and u.strip()
             ),
+            intelx_term=(getattr(args, "intelx", None) or None),
+            intelx_limit=int(getattr(args, "intelx_limit", 50) or 50),
         )
 
     def mode_parts(self) -> list[str]:
@@ -257,6 +261,7 @@ class ScanConfig:
             (bool(self.bssid or self.ssid), "Wigle"),
             (bool(self.company_query), "Company"),
             (bool(self.harvest_doc_urls), "DocMeta"),
+            (bool(self.intelx_term), "IntelX"),
             (bool(self.redteam_domain), "Redteam"),
             (self.enrichment, "Enrichment"),
             (self.tor, "Tor"),

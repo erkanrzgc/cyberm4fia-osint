@@ -392,6 +392,17 @@ def build_parser() -> argparse.ArgumentParser:
         "metadata from (repeatable). Pairs with --passive output's google "
         "dork \"files\" preset.",
     )
+    p.add_argument(
+        "--intelx", dest="intelx", type=str, default=None,
+        metavar="TERM",
+        help="Intelligence X selector to search (domain / email / IP / "
+        "BTC address / freeform). Hits land in passive_hits. "
+        "Requires INTELX_API_KEY.",
+    )
+    p.add_argument(
+        "--intelx-limit", dest="intelx_limit", type=int, default=50,
+        help="Cap on IntelX records per search (default 50)",
+    )
 
     # ── Red-team recon mode (corporate attack surface, CSV exports only) ──
     p.add_argument(

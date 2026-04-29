@@ -250,6 +250,60 @@ class HTTPClient:
             host_lock.release()
             global_lock.release()
 
+    async def post_json(
+        self,
+        url: str,
+        json_body: dict,
+        headers: dict | None = None,
+    ) -> tuple[int, dict | None, float]:
+        """POST a JSON body and parse the JSON response.
+
+        Mirrors :meth:`get_json` — same fingerprinting, retry, proxy,
+        and host-lock semantics. Returns ``(status, parsed_dict_or_None,
+        elapsed_seconds)``. ``None`` body on non-200 status or parse
+        failure.
+        """
+        session = self._require_session()
+        merged = self._headers(headers)
+        merged["Accept"] = "application/json"
+        merged.setdefault("Content-Type", "application/json")
+        global_lock, host_lock = await self._acquire(url)
+        try:
+            for attempt in range(RETRY_COUNT + 1):
+                start = time.monotonic()
+                proxy = self._next_http_proxy()
+                try:
+                    async with session.post(
+                        url,
+                        json=json_body,
+                        headers=merged,
+                        proxy=proxy,
+                    ) as resp:
+                        elapsed = time.monotonic() - start
+                        await self._post_request(url, resp.status, resp)
+                        self._record_proxy_result(proxy, success=True)
+                        if resp.status == 200:
+                            data = await resp.json(content_type=None)
+                            return resp.status, data, elapsed
+                        return resp.status, None, elapsed
+                except asyncio.TimeoutError:
+                    elapsed = time.monotonic() - start
+                    log.debug("post_json timeout on %s", url)
+                    self._record_proxy_result(proxy, success=False)
+                    if attempt == RETRY_COUNT:
+                        return 0, None, elapsed
+                except (aiohttp.ClientError, OSError, ValueError) as exc:
+                    elapsed = time.monotonic() - start
+                    log.debug("post_json error on %s: %s", url, exc)
+                    self._record_proxy_result(proxy, success=False)
+                    if attempt == RETRY_COUNT:
+                        return -1, None, elapsed
+                await asyncio.sleep(RETRY_DELAY * (attempt + 1))
+            return -1, None, 0.0
+        finally:
+            host_lock.release()
+            global_lock.release()
+
     async def get_bytes(
         self, url: str, headers: dict | None = None
     ) -> tuple[int, bytes | None, float]:

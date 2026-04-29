@@ -863,6 +863,28 @@ async def _phase_company(
     result.company_records = [r.to_dict() for r in recs]
 
 
+async def _phase_intelx(
+    client: HTTPClient,
+    cfg: ScanConfig,
+    result: ScanResult,
+) -> None:
+    """Search Intelligence X for paste / leak / dark-web mentions of ``intelx_term``.
+
+    Appends each hit (kind="leak", source="intelx") to
+    ``result.passive_hits`` so existing reporters surface them next to
+    Shodan / Censys / Wigle / etc. Silently skips when no API key is
+    set or no term is given.
+    """
+    if not cfg.intelx_term:
+        return
+    from modules.passive import intelx
+
+    hits = await intelx.search(
+        client, cfg.intelx_term, max_results=cfg.intelx_limit
+    )
+    result.passive_hits = list(result.passive_hits) + list(hits)
+
+
 async def _phase_doc_metadata(
     client: HTTPClient,
     cfg: ScanConfig,
@@ -1021,6 +1043,10 @@ async def run_scan(cfg: ScanConfig) -> ScanResult:
             phase="doc_metadata",
             documents=len(result.document_metadata),
         )
+
+        _emit("phase_start", phase="intelx")
+        await _phase_intelx(client, cfg, result)
+        _emit("phase_end", phase="intelx")
 
     _emit("phase_start", phase="cross_reference")
     _finalize_cross_reference(result)

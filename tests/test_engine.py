@@ -657,3 +657,46 @@ def test_scanconfig_from_args_picks_up_new_flags() -> None:
     assert "Wigle" in parts
     assert "Company" in parts
     assert "DocMeta" in parts
+
+
+# ── _phase_intelx ───────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_phase_intelx_noop_without_term() -> None:
+    from core.engine import _phase_intelx
+
+    cfg = ScanConfig(username="u")
+    result = ScanResult(username="u")
+    await _phase_intelx(client=None, cfg=cfg, result=result)
+    assert result.passive_hits == []
+
+
+@pytest.mark.asyncio
+async def test_phase_intelx_appends_to_passive_hits(monkeypatch) -> None:
+    from core.engine import _phase_intelx
+    from modules.passive.models import PassiveHit
+
+    async def fake_search(_client, term, *, max_results=50):
+        return [
+            PassiveHit(
+                source="intelx",
+                kind="leak",
+                value=f"paste-for-{term}",
+                title="pastes.public",
+                metadata={"size": 1024},
+            )
+        ]
+
+    from modules.passive import intelx
+
+    monkeypatch.setattr(intelx, "search", fake_search)
+
+    pre = PassiveHit(source="shodan", kind="host", value="1.2.3.4")
+    cfg = ScanConfig(username="u", intelx_term="acme.com", intelx_limit=10)
+    result = ScanResult(username="u", passive_hits=[pre])
+    await _phase_intelx(client=None, cfg=cfg, result=result)
+
+    assert len(result.passive_hits) == 2
+    sources = {h.source for h in result.passive_hits}
+    assert sources == {"shodan", "intelx"}
