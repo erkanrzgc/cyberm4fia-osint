@@ -89,6 +89,8 @@ class ScanResult:
     email_candidates: list = field(default_factory=list)  # EmailCandidate dicts
     github_committers: list = field(default_factory=list)  # GithubCommitter dicts
     recon_subdomains: list = field(default_factory=list)  # ReconSubdomain dicts
+    leaked_secrets: list = field(default_factory=list)  # LeakedSecret dicts
+    exif_reports: list = field(default_factory=list)  # ExifReport dicts
     reverse_image_hits: list = field(default_factory=list)  # ReverseImageHit
     historical_usernames: list = field(default_factory=list)  # HistoricalUsername
     phone_intel: list = field(default_factory=list)  # PhoneIntel entries
@@ -232,6 +234,14 @@ class ScanResult:
             "recon_subdomains": [
                 s.to_dict() if hasattr(s, "to_dict") else s
                 for s in self.recon_subdomains
+            ],
+            "leaked_secrets": [
+                s.to_dict() if hasattr(s, "to_dict") else s
+                for s in self.leaked_secrets
+            ],
+            "exif_reports": [
+                e.to_dict() if hasattr(e, "to_dict") else e
+                for e in self.exif_reports
             ],
             "reverse_image_hits": [
                 hit.to_dict() if hasattr(hit, "to_dict") else hit

@@ -328,11 +328,16 @@ async def test_phase_recon_populates_all_three_slots(monkeypatch, tmp_path):
         hosts = list(existing or []) + ["vpn.acme.com"]
         return [ReconSubdomain(host=h, source="dns_lookup") for h in hosts]
 
+    async def fake_secret_scan(_client, *, org=None, domain=None, repos=None,
+                               max_queries=20, max_hits_per_query=30):
+        return []
+
     import modules.dns_lookup as dns_lookup
-    from modules.recon import email_patterns, github_org, subdomains_extra
+    from modules.recon import email_patterns, github_org, github_secrets, subdomains_extra
 
     monkeypatch.setattr(dns_lookup, "enumerate_subdomains", fake_enum)
     monkeypatch.setattr(github_org, "scan_org", fake_scan_org)
+    monkeypatch.setattr(github_secrets, "scan_target", fake_secret_scan)
     monkeypatch.setattr(subdomains_extra, "enrich_subdomains", fake_enrich)
     monkeypatch.setattr(
         email_patterns,
@@ -369,3 +374,105 @@ async def test_phase_recon_populates_all_three_slots(monkeypatch, tmp_path):
     assert "github_committers" in payload
     assert "recon_subdomains" in payload
     assert payload["email_candidates"][0]["email"] == "a.b@acme.com"
+
+
+@pytest.mark.asyncio
+async def test_phase_recon_populates_leaked_secrets(monkeypatch):
+    from core.engine import _phase_recon
+    from modules.recon.models import LeakedSecret
+
+    async def fake_enum(_client, _domain):
+        return []
+
+    async def fake_scan_org(_client, _org, *, max_repos=30, commits_per_repo=30):
+        return []
+
+    async def fake_enrich(_client, _domain, *, existing=None):
+        return []
+
+    async def fake_secret_scan(_client, *, org=None, domain=None, repos=None,
+                               max_queries=20, max_hits_per_query=30):
+        assert org == "acme"
+        assert domain == "acme.com"
+        return [
+            LeakedSecret(
+                rule_id="aws_access_key",
+                value="AKIAIOSFODNN7XAAAAAA",
+                repo="acme/api",
+                file_path="src/config.py",
+                url="https://github.com/acme/api/blob/main/src/config.py",
+                snippet="KEY=AKIA...",
+            )
+        ]
+
+    import modules.dns_lookup as dns_lookup
+    from modules.recon import email_patterns, github_org, github_secrets, subdomains_extra
+
+    monkeypatch.setattr(dns_lookup, "enumerate_subdomains", fake_enum)
+    monkeypatch.setattr(github_org, "scan_org", fake_scan_org)
+    monkeypatch.setattr(github_secrets, "scan_target", fake_secret_scan)
+    monkeypatch.setattr(subdomains_extra, "enrich_subdomains", fake_enrich)
+    monkeypatch.setattr(email_patterns, "generate_bulk", lambda *a, **k: [])
+
+    cfg = ScanConfig(
+        username="u",
+        redteam_domain="acme.com",
+        redteam_github_org="acme",
+    )
+    result = ScanResult(username="u")
+    await _phase_recon(client=None, cfg=cfg, result=result)
+
+    assert len(result.leaked_secrets) == 1
+    assert result.leaked_secrets[0]["rule_id"] == "aws_access_key"
+    assert result.leaked_secrets[0]["repo"] == "acme/api"
+
+    payload = result.to_dict()
+    assert "leaked_secrets" in payload
+    assert payload["leaked_secrets"][0]["value"] == "AKIAIOSFODNN7XAAAAAA"
+
+
+@pytest.mark.asyncio
+async def test_phase_exif_processes_image_urls(monkeypatch):
+    from core.engine import _phase_exif
+    from modules.analysis.models import ExifReport
+
+    async def fake_extract(_client, url):
+        return ExifReport(
+            source=url,
+            gps_lat=48.85833,
+            gps_lon=2.29444,
+            camera_model="Pixel 7",
+            taken_at="2023:11:20 09:15:00",
+        )
+
+    from modules.analysis import exif
+
+    monkeypatch.setattr(exif, "extract_from_url", fake_extract)
+
+    cfg = ScanConfig(
+        username="u",
+        exif_image_urls=(
+            "https://cdn.example.com/a.jpg",
+            "https://cdn.example.com/b.jpg",
+        ),
+    )
+    result = ScanResult(username="u")
+    await _phase_exif(client=None, cfg=cfg, result=result)
+
+    assert len(result.exif_reports) == 2
+    assert result.exif_reports[0]["camera_model"] == "Pixel 7"
+    assert result.exif_reports[0]["gps_lat"] == 48.85833
+
+    payload = result.to_dict()
+    assert "exif_reports" in payload
+    assert payload["exif_reports"][1]["source"].endswith("b.jpg")
+
+
+@pytest.mark.asyncio
+async def test_phase_exif_noop_without_urls() -> None:
+    from core.engine import _phase_exif
+
+    cfg = ScanConfig(username="u")
+    result = ScanResult(username="u")
+    await _phase_exif(client=None, cfg=cfg, result=result)
+    assert result.exif_reports == []

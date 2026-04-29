@@ -290,7 +290,8 @@ async def test_wayback_empty_cdx_returns_empty() -> None:
 @pytest.mark.asyncio
 async def test_run_passive_without_anything_is_empty(monkeypatch) -> None:
     for var in ("SHODAN_API_KEY", "CENSYS_API_ID", "CENSYS_API_SECRET",
-                "FOFA_EMAIL", "FOFA_KEY", "ZOOMEYE_API_KEY"):
+                "FOFA_EMAIL", "FOFA_KEY", "ZOOMEYE_API_KEY", "SERPAPI_API_KEY",
+                "CRIMINALIP_API_KEY"):
         monkeypatch.delenv(var, raising=False)
     async with HTTPClient() as client:
         hits = await run_passive(client, username="", domain=None)
@@ -298,9 +299,73 @@ async def test_run_passive_without_anything_is_empty(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
+async def test_run_passive_includes_google_dork_via_ddg_fallback(monkeypatch) -> None:
+    for var in ("SHODAN_API_KEY", "CENSYS_API_ID", "CENSYS_API_SECRET",
+                "FOFA_EMAIL", "FOFA_KEY", "ZOOMEYE_API_KEY", "SERPAPI_API_KEY",
+                "CRIMINALIP_API_KEY"):
+        monkeypatch.delenv(var, raising=False)
+
+    ddg_html = (
+        '<div class="result">'
+        '<a class="result__a" href="https://leak.example.com/x">Leaked</a>'
+        '<a class="result__snippet" href="#">contains password</a>'
+        '</div>'
+    )
+    with aioresponses() as m:
+        m.get(re.compile(r"https://html\.duckduckgo\.com/.*"), body=ddg_html, repeat=True)
+        m.get(re.compile(r"https://api\.hackertarget\.com/.*"), body="")
+        m.get(re.compile(r"https://www\.threatcrowd\.org/.*"), payload={})
+        m.get(re.compile(r"https://web\.archive\.org/cdx/.*"), payload=[])
+        m.get(re.compile(r"https://psbdmp\.ws/.*"), payload={"data": []})
+        m.get(re.compile(r"https://ahmia\.fi/.*"), body="")
+        async with HTTPClient() as client:
+            hits = await run_passive(
+                client, username="alice", domain="example.com"
+            )
+
+    dork_hits = [h for h in hits if h.source == "google_dork"]
+    assert dork_hits, "expected google_dork hits via DDG fallback"
+    assert dork_hits[0].metadata["provider"] == "ddg"
+
+
+@pytest.mark.asyncio
+async def test_run_passive_includes_criminalip_when_key_set(monkeypatch) -> None:
+    for var in ("SHODAN_API_KEY", "CENSYS_API_ID", "CENSYS_API_SECRET",
+                "FOFA_EMAIL", "FOFA_KEY", "ZOOMEYE_API_KEY", "SERPAPI_API_KEY"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("CRIMINALIP_API_KEY", "k")
+
+    cip_payload = {
+        "status": 200,
+        "data": {
+            "ip_data": [
+                {"ip_address": "7.7.7.7", "country_code": "JP",
+                 "as_name": "ISP J", "open_port_no": 443,
+                 "score": {"inbound": 5, "outbound": 1}},
+            ]
+        },
+    }
+    with aioresponses() as m:
+        m.get(re.compile(r"https://api\.criminalip\.io/.*"), payload=cip_payload)
+        m.get(re.compile(r"https://html\.duckduckgo\.com/.*"), body="")
+        m.get(re.compile(r"https://api\.hackertarget\.com/.*"), body="")
+        m.get(re.compile(r"https://www\.threatcrowd\.org/.*"), payload={})
+        m.get(re.compile(r"https://web\.archive\.org/cdx/.*"), payload=[])
+        m.get(re.compile(r"https://psbdmp\.ws/.*"), payload={"data": []})
+        m.get(re.compile(r"https://ahmia\.fi/.*"), body="")
+        async with HTTPClient() as client:
+            hits = await run_passive(client, username="alice", domain="example.com")
+
+    cip_hits = [h for h in hits if h.source == "criminalip"]
+    assert cip_hits, "expected criminalip hits when key is set"
+    assert cip_hits[0].metadata["score_inbound"] == 5
+
+
+@pytest.mark.asyncio
 async def test_run_passive_fan_out_merges_and_dedupes(monkeypatch) -> None:
     monkeypatch.setenv("SHODAN_API_KEY", "k")
-    for var in ("CENSYS_API_ID", "CENSYS_API_SECRET", "FOFA_EMAIL", "FOFA_KEY", "ZOOMEYE_API_KEY"):
+    for var in ("CENSYS_API_ID", "CENSYS_API_SECRET", "FOFA_EMAIL", "FOFA_KEY",
+                "ZOOMEYE_API_KEY", "CRIMINALIP_API_KEY"):
         monkeypatch.delenv(var, raising=False)
 
     shodan_payload = {

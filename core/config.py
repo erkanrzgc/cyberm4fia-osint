@@ -124,6 +124,7 @@ class ScanConfig:
     redteam_domain: str | None = None
     redteam_names_file: str | None = None
     redteam_github_org: str | None = None
+    exif_image_urls: tuple[str, ...] = ()
 
     @classmethod
     def from_args(cls, args, username: str) -> ScanConfig:
@@ -211,6 +212,11 @@ class ScanConfig:
             redteam_domain=(getattr(args, "redteam_domain", None) or None),
             redteam_names_file=(getattr(args, "redteam_names_file", None) or None),
             redteam_github_org=(getattr(args, "redteam_github_org", None) or None),
+            exif_image_urls=tuple(
+                u.strip()
+                for u in (getattr(args, "exif_url", None) or [])
+                if u and u.strip()
+            ),
         )
 
     def mode_parts(self) -> list[str]:

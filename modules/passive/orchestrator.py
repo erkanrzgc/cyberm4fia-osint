@@ -24,7 +24,9 @@ from core.logging_setup import get_logger
 from modules.passive import (
     ahmia,
     censys,
+    criminalip,
     fofa,
+    google_dork,
     harvester,
     pastebin,
     shodan,
@@ -83,9 +85,11 @@ async def run_passive(
     if domain:
         tasks.append(("shodan", lambda: shodan.search(client, domain)))
         tasks.append(("censys", lambda: censys.search(client, domain)))
+        tasks.append(("criminalip", lambda: criminalip.search(client, domain)))
         tasks.append(("fofa", lambda: fofa.search(client, domain)))
         tasks.append(("zoomeye", lambda: zoomeye.search(client, domain)))
         tasks.append(("harvester", lambda: harvester.search(client, domain)))
+        tasks.append(("google-dork", lambda: google_dork.search(client, domain)))
         tasks.append(("wayback-domain", lambda: wayback.snapshots_for_domain(client, domain)))
 
     if username:

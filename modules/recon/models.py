@@ -74,3 +74,36 @@ class ReconSubdomain:
             "source": self.source,
             "metadata": dict(self.metadata),
         }
+
+
+@dataclass(frozen=True)
+class LeakedSecret:
+    """A credential-shaped string surfaced from public source code.
+
+    ``rule_id`` identifies which detector matched (``aws_access_key``,
+    ``github_pat``, etc.). ``value`` is the raw match — the caller is
+    expected to treat this data sensitively even though it came from a
+    public source.
+
+    ``url`` points to the GitHub blob view at the matching line so a
+    human can verify the finding before acting on it.
+    """
+
+    rule_id: str
+    value: str
+    repo: str
+    file_path: str
+    url: str
+    snippet: str = ""
+    metadata: dict = field(default_factory=dict)
+
+    def to_dict(self) -> dict:
+        return {
+            "rule_id": self.rule_id,
+            "value": self.value,
+            "repo": self.repo,
+            "file_path": self.file_path,
+            "url": self.url,
+            "snippet": self.snippet,
+            "metadata": dict(self.metadata),
+        }

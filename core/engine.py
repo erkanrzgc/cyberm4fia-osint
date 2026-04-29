@@ -766,7 +766,7 @@ async def _phase_recon(
     if not cfg.redteam_domain:
         return
     from modules.dns_lookup import enumerate_subdomains
-    from modules.recon import email_patterns, github_org, subdomains_extra
+    from modules.recon import email_patterns, github_org, github_secrets, subdomains_extra
 
     domain = cfg.redteam_domain.strip().lower().lstrip("@")
     org = (cfg.redteam_github_org or domain.split(".", 1)[0]).strip()
@@ -779,9 +779,10 @@ async def _phase_recon(
         except OSError:
             names = []
 
-    seed_subs, committers = await asyncio.gather(
+    seed_subs, committers, secrets = await asyncio.gather(
         enumerate_subdomains(client, domain),
         github_org.scan_org(client, org),
+        github_secrets.scan_target(client, org=org, domain=domain),
     )
     subs = await subdomains_extra.enrich_subdomains(
         client, domain, existing=seed_subs
@@ -791,6 +792,36 @@ async def _phase_recon(
     result.email_candidates = [c.to_dict() for c in candidates]
     result.github_committers = [g.to_dict() for g in committers]
     result.recon_subdomains = [s.to_dict() for s in subs]
+    result.leaked_secrets = [s.to_dict() for s in secrets]
+
+
+async def _phase_exif(
+    client: HTTPClient,
+    cfg: ScanConfig,
+    result: ScanResult,
+) -> None:
+    """Pull EXIF metadata from any image URLs the caller supplied.
+
+    EXIF blocks routinely leak GPS, capture timestamp, device serial,
+    and editing-software fingerprint — all directly actionable for
+    geolocation and pretext crafting. Runs only when the caller
+    populates ``cfg.exif_image_urls``; we do not auto-discover images
+    here to keep the phase predictable.
+    """
+    if not cfg.exif_image_urls:
+        return
+    from modules.analysis import exif
+
+    reports = await asyncio.gather(
+        *(exif.extract_from_url(client, url) for url in cfg.exif_image_urls),
+        return_exceptions=True,
+    )
+    out = []
+    for r in reports:
+        if isinstance(r, BaseException):
+            continue
+        out.append(r.to_dict())
+    result.exif_reports = out
 
 
 async def _phase_geocode(cfg: ScanConfig, result: ScanResult) -> None:
@@ -906,7 +937,12 @@ async def run_scan(cfg: ScanConfig) -> ScanResult:
             subdomains=len(result.recon_subdomains),
             committers=len(result.github_committers),
             candidates=len(result.email_candidates),
+            secrets=len(result.leaked_secrets),
         )
+
+        _emit("phase_start", phase="exif")
+        await _phase_exif(client, cfg, result)
+        _emit("phase_end", phase="exif", reports=len(result.exif_reports))
 
     _emit("phase_start", phase="cross_reference")
     _finalize_cross_reference(result)
