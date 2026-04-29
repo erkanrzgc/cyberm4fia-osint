@@ -77,6 +77,66 @@ class ReconSubdomain:
 
 
 @dataclass(frozen=True)
+class CompanyOfficer:
+    """One officer/director row attached to a CompanyRecord.
+
+    OpenCorporates exposes the officer's display name, role title
+    (``director`` / ``secretary`` / ``CEO``…), and tenure dates.
+    These rows are the highest-value pivot back into the people-side
+    OSINT pipeline: every officer name → email_patterns → SE arsenal.
+    """
+
+    name: str
+    position: str = ""
+    start_date: str = ""
+    end_date: str = ""
+
+    def to_dict(self) -> dict:
+        return {
+            "name": self.name,
+            "position": self.position,
+            "start_date": self.start_date,
+            "end_date": self.end_date,
+        }
+
+
+@dataclass(frozen=True)
+class CompanyRecord:
+    """A corporate registry entry from OpenCorporates.
+
+    Combines the public-search payload (name, jurisdiction, number,
+    address, status, url) with the per-company officer/director list
+    when ``officers`` is populated. ``url`` always points to the
+    OpenCorporates page for human verification — corporate registry
+    data is high-stakes, never act on it without spot-checking the
+    source.
+    """
+
+    name: str
+    jurisdiction_code: str
+    company_number: str
+    incorporation_date: str = ""
+    company_type: str = ""
+    registered_address: str = ""
+    status: str = ""
+    url: str = ""
+    officers: tuple[CompanyOfficer, ...] = ()
+
+    def to_dict(self) -> dict:
+        return {
+            "name": self.name,
+            "jurisdiction_code": self.jurisdiction_code,
+            "company_number": self.company_number,
+            "incorporation_date": self.incorporation_date,
+            "company_type": self.company_type,
+            "registered_address": self.registered_address,
+            "status": self.status,
+            "url": self.url,
+            "officers": [o.to_dict() for o in self.officers],
+        }
+
+
+@dataclass(frozen=True)
 class DocumentMetadata:
     """Metadata extracted from a public document (PDF / DOCX / XLSX).
 
