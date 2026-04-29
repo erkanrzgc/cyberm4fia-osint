@@ -371,6 +371,81 @@ def _redteam_recon_block(data: dict) -> str:
     {''.join(sections)}"""
 
 
+def _company_records_block(data: dict) -> str:
+    """OpenCorporates records — companies + their officers/directors."""
+    companies = data.get("company_records") or []
+    if not companies:
+        return ""
+
+    cards: list[str] = []
+    for c in companies:
+        officer_rows = "".join(
+            f"<tr><td>{escape(str(o.get('name', '')))}</td>"
+            f"<td>{escape(str(o.get('position', '')))}</td>"
+            f"<td>{escape(str(o.get('start_date', '')))}</td>"
+            f"<td>{escape(str(o.get('end_date', '')))}</td></tr>"
+            for o in (c.get("officers") or [])
+        )
+        officer_table = ""
+        if officer_rows:
+            officer_table = (
+                "<table>"
+                "<thead><tr><th>Name</th><th>Position</th>"
+                "<th>Start</th><th>End</th></tr></thead>"
+                f"<tbody>{officer_rows}</tbody>"
+                "</table>"
+            )
+        url = escape(str(c.get("url") or ""))
+        url_link = f'<a href="{url}" target="_blank">view</a>' if url else ""
+        cards.append(f"""
+        <div class="card">
+            <h3>{escape(str(c.get('name', '')))} ({escape(str(c.get('jurisdiction_code', '')))}/{escape(str(c.get('company_number', '')))})</h3>
+            <p class="muted">
+                Status: {escape(str(c.get('status') or '-'))} ·
+                Type: {escape(str(c.get('company_type') or '-'))} ·
+                Incorporated: {escape(str(c.get('incorporation_date') or '-'))} ·
+                {url_link}
+            </p>
+            <p>{escape(str(c.get('registered_address') or ''))}</p>
+            {officer_table}
+        </div>""")
+
+    return f"""
+    <h2>Corporate Records ({len(companies)})</h2>
+    {''.join(cards)}"""
+
+
+def _document_metadata_block(data: dict) -> str:
+    """Metagoofil-style document metadata harvest."""
+    docs = data.get("document_metadata") or []
+    if not docs:
+        return ""
+
+    rows = "".join(
+        f"<tr>"
+        f"<td><a href=\"{escape(str(d.get('url', '')))}\" target=\"_blank\">"
+        f"{escape(str(d.get('format', '')).upper())}</a></td>"
+        f"<td>{escape(str(d.get('author') or ''))}</td>"
+        f"<td>{escape(str(d.get('last_author') or ''))}</td>"
+        f"<td>{escape(str(d.get('software') or ''))}</td>"
+        f"<td>{escape(str(d.get('company') or ''))}</td>"
+        f"<td>{escape(', '.join(d.get('network_paths') or []))}</td>"
+        f"</tr>"
+        for d in docs
+    )
+    return f"""
+    <h2>Document Metadata ({len(docs)})</h2>
+    <div class="card">
+        <table>
+            <thead><tr>
+                <th>Type</th><th>Author</th><th>Last Modified By</th>
+                <th>Software</th><th>Company</th><th>Network Paths</th>
+            </tr></thead>
+            <tbody>{rows}</tbody>
+        </table>
+    </div>"""
+
+
 def _variations_block(data: dict) -> str:
     if not (data["variations_checked"] or data["discovered_usernames"]):
         return ""
@@ -494,6 +569,8 @@ def render_html(data: dict) -> str:
     {_dns_block(data)}
     {_subdomain_block(data)}
     {_redteam_recon_block(data)}
+    {_company_records_block(data)}
+    {_document_metadata_block(data)}
     {_variations_block(data)}
 </body>
 </html>"""

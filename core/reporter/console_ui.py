@@ -141,6 +141,8 @@ def print_results(result: ScanResult) -> None:
     _print_dns(result)
     _print_subdomains(result)
     _print_redteam_recon(result)
+    _print_company_records(result)
+    _print_document_metadata(result)
     _print_web_presence(result)
     _print_variations(result)
     _print_discovered_usernames(result)
@@ -642,6 +644,76 @@ def _print_redteam_recon(result: ScanResult) -> None:
         if len(candidates) > 30:
             table.caption = f"... and {len(candidates) - 30} more"
         console.print(table)
+
+
+def _print_company_records(result: ScanResult) -> None:
+    """Render OpenCorporates company records and their officers."""
+    companies = getattr(result, "company_records", None) or []
+    if not companies:
+        return
+    console.print()
+    for c in companies:
+        title = (
+            f"{c.get('name', '?')} "
+            f"({c.get('jurisdiction_code', '')}/{c.get('company_number', '')})"
+        )
+        meta_bits = [
+            c.get("company_type") or "",
+            f"status={c.get('status') or '-'}",
+            f"inc={c.get('incorporation_date') or '-'}",
+        ]
+        meta_line = " · ".join(b for b in meta_bits if b)
+        body_lines = [f"  [dim]{meta_line}[/dim]"]
+        addr = c.get("registered_address")
+        if addr:
+            body_lines.append(f"  [white]{addr}[/white]")
+        officers = c.get("officers") or []
+        if officers:
+            body_lines.append("")
+            for o in officers[:10]:
+                pos = o.get("position") or ""
+                pos_part = f" [dim]({pos})[/dim]" if pos else ""
+                body_lines.append(f"  • [cyan]{o.get('name', '?')}[/cyan]{pos_part}")
+            if len(officers) > 10:
+                body_lines.append(f"  [dim]... and {len(officers) - 10} more[/dim]")
+        console.print(
+            Panel(
+                "\n".join(body_lines),
+                title=f"[bold]{title}[/bold]",
+                border_style="magenta",
+            )
+        )
+
+
+def _print_document_metadata(result: ScanResult) -> None:
+    """Render document metadata (Metagoofil-style harvest)."""
+    docs = getattr(result, "document_metadata", None) or []
+    if not docs:
+        return
+    console.print()
+    table = Table(
+        title="Document Metadata",
+        box=box.SIMPLE_HEAVY,
+        title_style="bold magenta",
+        header_style="bold",
+    )
+    table.add_column("Type", min_width=5)
+    table.add_column("Author", min_width=18)
+    table.add_column("Last Modified By", min_width=14)
+    table.add_column("Software", min_width=18)
+    table.add_column("Network Paths", min_width=20)
+    for d in docs[:30]:
+        paths = ", ".join(d.get("network_paths") or [])
+        table.add_row(
+            (d.get("format") or "").upper(),
+            d.get("author") or "",
+            d.get("last_author") or "",
+            d.get("software") or "",
+            paths,
+        )
+    if len(docs) > 30:
+        table.caption = f"... and {len(docs) - 30} more"
+    console.print(table)
 
 
 def _print_web_presence(result: ScanResult) -> None:

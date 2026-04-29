@@ -824,6 +824,64 @@ async def _phase_exif(
     result.exif_reports = out
 
 
+async def _phase_wigle(
+    client: HTTPClient,
+    cfg: ScanConfig,
+    result: ScanResult,
+) -> None:
+    """Resolve a BSSID/MAC or SSID to physical locations via Wigle.net.
+
+    Appends each hit (kind="bssid" or kind="ssid") to ``result.passive_hits``
+    so existing reporters surface them next to the other passive sources.
+    Silently skips when no creds are configured or no inputs are given.
+    """
+    if not (cfg.bssid or cfg.ssid):
+        return
+    from modules.passive import wigle
+
+    hits = await wigle.search(client, bssid=cfg.bssid, ssid=cfg.ssid)
+    result.passive_hits = list(result.passive_hits) + list(hits)
+
+
+async def _phase_company(
+    client: HTTPClient,
+    cfg: ScanConfig,
+    result: ScanResult,
+) -> None:
+    """Fetch corporate registry records (with officers) for a company query.
+
+    Stores the enriched ``CompanyRecord`` dicts in
+    ``result.company_records``; downstream reporters key on that field.
+    """
+    if not cfg.company_query:
+        return
+    from modules.passive import opencorporates
+
+    recs = await opencorporates.search_with_officers(
+        client, cfg.company_query, limit=cfg.company_limit
+    )
+    result.company_records = [r.to_dict() for r in recs]
+
+
+async def _phase_doc_metadata(
+    client: HTTPClient,
+    cfg: ScanConfig,
+    result: ScanResult,
+) -> None:
+    """Extract embedded metadata from a list of public document URLs.
+
+    Pairs naturally with passive/google_dork's "files" preset — feed
+    the dork hits straight into ``--harvest-doc`` to surface authors,
+    last-modifiers, and internal SMB share paths.
+    """
+    if not cfg.harvest_doc_urls:
+        return
+    from modules.recon import doc_metadata
+
+    docs = await doc_metadata.extract_batch(client, list(cfg.harvest_doc_urls))
+    result.document_metadata = [d.to_dict() for d in docs]
+
+
 async def _phase_geocode(cfg: ScanConfig, result: ScanResult) -> None:
     """Resolve location strings found in profile data to lat/lng.
 
@@ -943,6 +1001,26 @@ async def run_scan(cfg: ScanConfig) -> ScanResult:
         _emit("phase_start", phase="exif")
         await _phase_exif(client, cfg, result)
         _emit("phase_end", phase="exif", reports=len(result.exif_reports))
+
+        _emit("phase_start", phase="wigle")
+        await _phase_wigle(client, cfg, result)
+        _emit("phase_end", phase="wigle")
+
+        _emit("phase_start", phase="company")
+        await _phase_company(client, cfg, result)
+        _emit(
+            "phase_end",
+            phase="company",
+            companies=len(result.company_records),
+        )
+
+        _emit("phase_start", phase="doc_metadata")
+        await _phase_doc_metadata(client, cfg, result)
+        _emit(
+            "phase_end",
+            phase="doc_metadata",
+            documents=len(result.document_metadata),
+        )
 
     _emit("phase_start", phase="cross_reference")
     _finalize_cross_reference(result)

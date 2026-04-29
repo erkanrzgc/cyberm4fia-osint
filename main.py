@@ -361,6 +361,38 @@ def build_parser() -> argparse.ArgumentParser:
         "--schedule-interval", dest="schedule_interval", type=float, default=60.0,
         help="Minutes between scheduled passes (default 60)",
     )
+    # ── Standalone OSINT pivots (independent of username/redteam flow) ──
+    p.add_argument(
+        "--bssid", dest="bssid", type=str, default=None,
+        metavar="MAC",
+        help="BSSID/MAC to resolve to a physical location via Wigle.net "
+        "(needs WIGLE_API_NAME + WIGLE_API_TOKEN)",
+    )
+    p.add_argument(
+        "--ssid", dest="ssid", type=str, default=None,
+        help="SSID name to enumerate every location it has been seen at "
+        "(Wigle.net; same auth as --bssid)",
+    )
+    p.add_argument(
+        "--company", dest="company", type=str, default=None,
+        metavar="NAME",
+        help="Company name (or domain root) to look up in OpenCorporates: "
+        "fetches officers/directors per result. Anonymous tier works; "
+        "OPENCORPORATES_API_TOKEN raises rate limits.",
+    )
+    p.add_argument(
+        "--company-limit", dest="company_limit", type=int, default=5,
+        help="Max companies to fully enrich for --company (default 5; each "
+        "company costs one extra API call for the officer list)",
+    )
+    p.add_argument(
+        "--harvest-doc", dest="harvest_doc", action="append", default=None,
+        metavar="URL",
+        help="URL of a public PDF/DOCX/XLSX/PPTX to extract embedded "
+        "metadata from (repeatable). Pairs with --passive output's google "
+        "dork \"files\" preset.",
+    )
+
     # ── Red-team recon mode (corporate attack surface, CSV exports only) ──
     p.add_argument(
         "--redteam-domain", dest="redteam_domain", type=str, default=None,

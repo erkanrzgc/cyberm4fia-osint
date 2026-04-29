@@ -476,3 +476,184 @@ async def test_phase_exif_noop_without_urls() -> None:
     result = ScanResult(username="u")
     await _phase_exif(client=None, cfg=cfg, result=result)
     assert result.exif_reports == []
+
+
+# ── _phase_wigle ────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_phase_wigle_noop_without_bssid_or_ssid() -> None:
+    from core.engine import _phase_wigle
+
+    cfg = ScanConfig(username="u")  # no bssid, no ssid
+    result = ScanResult(username="u")
+    await _phase_wigle(client=None, cfg=cfg, result=result)
+    assert result.passive_hits == []
+
+
+@pytest.mark.asyncio
+async def test_phase_wigle_appends_to_passive_hits(monkeypatch) -> None:
+    from core.engine import _phase_wigle
+    from modules.passive.models import PassiveHit
+
+    async def fake_search(_client, *, bssid=None, ssid=None, limit=10):
+        return [
+            PassiveHit(
+                source="wigle",
+                kind="bssid",
+                value=bssid or "",
+                title="ACME-WiFi",
+                metadata={"lat": 40.0, "lon": -74.0},
+            )
+        ]
+
+    from modules.passive import wigle
+
+    monkeypatch.setattr(wigle, "search", fake_search)
+
+    # Pre-existing passive_hit must be preserved
+    pre = PassiveHit(source="shodan", kind="host", value="1.2.3.4")
+    cfg = ScanConfig(username="u", bssid="AA:BB:CC:DD:EE:FF")
+    result = ScanResult(username="u", passive_hits=[pre])
+    await _phase_wigle(client=None, cfg=cfg, result=result)
+
+    assert len(result.passive_hits) == 2
+    sources = {h.source for h in result.passive_hits}
+    assert sources == {"shodan", "wigle"}
+
+
+# ── _phase_company ──────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_phase_company_noop_without_query() -> None:
+    from core.engine import _phase_company
+
+    cfg = ScanConfig(username="u")
+    result = ScanResult(username="u")
+    await _phase_company(client=None, cfg=cfg, result=result)
+    assert result.company_records == []
+
+
+@pytest.mark.asyncio
+async def test_phase_company_populates_records(monkeypatch) -> None:
+    from core.engine import _phase_company
+    from modules.recon.models import CompanyOfficer, CompanyRecord
+
+    async def fake_search_with_officers(_client, query, *, limit=5):
+        return [
+            CompanyRecord(
+                name="ACME CORP",
+                jurisdiction_code="us_de",
+                company_number="12345",
+                officers=(CompanyOfficer(name="Alice Doe", position="director"),),
+            )
+        ]
+
+    from modules.passive import opencorporates
+
+    monkeypatch.setattr(
+        opencorporates, "search_with_officers", fake_search_with_officers
+    )
+
+    cfg = ScanConfig(username="u", company_query="Acme")
+    result = ScanResult(username="u")
+    await _phase_company(client=None, cfg=cfg, result=result)
+
+    assert len(result.company_records) == 1
+    assert result.company_records[0]["name"] == "ACME CORP"
+    assert result.company_records[0]["officers"][0]["name"] == "Alice Doe"
+
+    payload = result.to_dict()
+    assert "company_records" in payload
+    assert payload["company_records"][0]["jurisdiction_code"] == "us_de"
+
+
+# ── _phase_doc_metadata ────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_phase_doc_metadata_noop_without_urls() -> None:
+    from core.engine import _phase_doc_metadata
+
+    cfg = ScanConfig(username="u")
+    result = ScanResult(username="u")
+    await _phase_doc_metadata(client=None, cfg=cfg, result=result)
+    assert result.document_metadata == []
+
+
+@pytest.mark.asyncio
+async def test_phase_doc_metadata_extracts_batch(monkeypatch) -> None:
+    from core.engine import _phase_doc_metadata
+    from modules.recon.models import DocumentMetadata
+
+    async def fake_extract_batch(_client, urls, *, max_size=10 * 1024 * 1024):
+        return [
+            DocumentMetadata(
+                url=u,
+                format="pdf",
+                author=f"author-{i}",
+            )
+            for i, u in enumerate(urls)
+        ]
+
+    from modules.recon import doc_metadata
+
+    monkeypatch.setattr(doc_metadata, "extract_batch", fake_extract_batch)
+
+    cfg = ScanConfig(
+        username="u",
+        harvest_doc_urls=(
+            "https://t.example/a.pdf",
+            "https://t.example/b.pdf",
+        ),
+    )
+    result = ScanResult(username="u")
+    await _phase_doc_metadata(client=None, cfg=cfg, result=result)
+
+    assert len(result.document_metadata) == 2
+    assert result.document_metadata[0]["author"] == "author-0"
+
+    payload = result.to_dict()
+    assert "document_metadata" in payload
+    assert payload["document_metadata"][1]["url"].endswith("b.pdf")
+
+
+# ── ScanConfig.from_args mapping for the new flags ────────────────
+
+
+def test_scanconfig_from_args_picks_up_new_flags() -> None:
+    """Smoke test: the new CLI flags propagate into ScanConfig."""
+    import argparse
+
+    from core.config import ScanConfig
+
+    ns = argparse.Namespace(
+        # All existing flags get falsy defaults; we only care about the new ones.
+        no_deep=True, smart=False, email=False, web=False, full=False,
+        whois=False, breach=False, photo=False, dns=False, subdomain=False,
+        holehe=False, ghunt=False, toutatis=False, recursive=False,
+        recursive_depth=1, passive=False, domain=None, reverse_image=False,
+        past_usernames=False, phone=None, phone_region=None, crypto=None,
+        proxy=None, tor=False, category=None, timeout=None,
+        deep=False, quick=True,
+        # The four new flags:
+        bssid="AA:BB:CC:DD:EE:FF",
+        ssid="ACME-Guest",
+        company="Acme Corp",
+        company_limit=3,
+        harvest_doc=["https://t.example/a.pdf", "https://t.example/b.pdf"],
+    )
+    cfg = ScanConfig.from_args(ns, "u")
+    assert cfg.bssid == "AA:BB:CC:DD:EE:FF"
+    assert cfg.ssid == "ACME-Guest"
+    assert cfg.company_query == "Acme Corp"
+    assert cfg.company_limit == 3
+    assert cfg.harvest_doc_urls == (
+        "https://t.example/a.pdf",
+        "https://t.example/b.pdf",
+    )
+    parts = cfg.mode_parts()
+    assert "Wigle" in parts
+    assert "Company" in parts
+    assert "DocMeta" in parts

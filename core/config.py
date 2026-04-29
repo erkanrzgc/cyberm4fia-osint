@@ -125,6 +125,11 @@ class ScanConfig:
     redteam_names_file: str | None = None
     redteam_github_org: str | None = None
     exif_image_urls: tuple[str, ...] = ()
+    bssid: str | None = None
+    ssid: str | None = None
+    company_query: str | None = None
+    company_limit: int = 5
+    harvest_doc_urls: tuple[str, ...] = ()
 
     @classmethod
     def from_args(cls, args, username: str) -> ScanConfig:
@@ -217,6 +222,15 @@ class ScanConfig:
                 for u in (getattr(args, "exif_url", None) or [])
                 if u and u.strip()
             ),
+            bssid=(getattr(args, "bssid", None) or None),
+            ssid=(getattr(args, "ssid", None) or None),
+            company_query=(getattr(args, "company", None) or None),
+            company_limit=int(getattr(args, "company_limit", 5) or 5),
+            harvest_doc_urls=tuple(
+                u.strip()
+                for u in (getattr(args, "harvest_doc", None) or [])
+                if u and u.strip()
+            ),
         )
 
     def mode_parts(self) -> list[str]:
@@ -240,6 +254,9 @@ class ScanConfig:
             (self.past_usernames, "PastUsernames"),
             (bool(self.phone), "Phone"),
             (bool(self.crypto_addresses), "Crypto"),
+            (bool(self.bssid or self.ssid), "Wigle"),
+            (bool(self.company_query), "Company"),
+            (bool(self.harvest_doc_urls), "DocMeta"),
             (bool(self.redteam_domain), "Redteam"),
             (self.enrichment, "Enrichment"),
             (self.tor, "Tor"),

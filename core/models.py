@@ -91,6 +91,8 @@ class ScanResult:
     recon_subdomains: list = field(default_factory=list)  # ReconSubdomain dicts
     leaked_secrets: list = field(default_factory=list)  # LeakedSecret dicts
     exif_reports: list = field(default_factory=list)  # ExifReport dicts
+    company_records: list = field(default_factory=list)  # CompanyRecord dicts
+    document_metadata: list = field(default_factory=list)  # DocumentMetadata dicts
     reverse_image_hits: list = field(default_factory=list)  # ReverseImageHit
     historical_usernames: list = field(default_factory=list)  # HistoricalUsername
     phone_intel: list = field(default_factory=list)  # PhoneIntel entries
@@ -242,6 +244,14 @@ class ScanResult:
             "exif_reports": [
                 e.to_dict() if hasattr(e, "to_dict") else e
                 for e in self.exif_reports
+            ],
+            "company_records": [
+                c.to_dict() if hasattr(c, "to_dict") else c
+                for c in self.company_records
+            ],
+            "document_metadata": [
+                d.to_dict() if hasattr(d, "to_dict") else d
+                for d in self.document_metadata
             ],
             "reverse_image_hits": [
                 hit.to_dict() if hasattr(hit, "to_dict") else hit
