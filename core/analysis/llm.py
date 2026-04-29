@@ -51,10 +51,12 @@ DEFAULT_GPU_LAYERS = int(os.environ.get("CYBERM4FIA_LLM_GPU_LAYERS", "-1"))
 DEFAULT_BACKEND = os.environ.get("CYBERM4FIA_LLM_BACKEND", "http").lower()
 DEFAULT_HTTP_URL = os.environ.get(
     "CYBERM4FIA_LLM_URL",
-    "http://localhost:1234/v1/chat/completions",
+    "https://integrate.api.nvidia.com/v1/chat/completions",
 )
-DEFAULT_HTTP_MODEL = os.environ.get("CYBERM4FIA_LLM_MODEL", "")
-DEFAULT_HTTP_API_KEY = os.environ.get("CYBERM4FIA_LLM_API_KEY", "lm-studio")
+DEFAULT_HTTP_MODEL = os.environ.get(
+    "CYBERM4FIA_LLM_MODEL", "meta/llama-3.3-70b-instruct"
+)
+DEFAULT_HTTP_API_KEY = os.environ.get("CYBERM4FIA_LLM_API_KEY", "")
 DEFAULT_HTTP_TIMEOUT = float(os.environ.get("CYBERM4FIA_LLM_TIMEOUT", "120"))
 
 
@@ -121,7 +123,7 @@ class LlamaCppBackend:
 
 
 class HttpBackend:
-    """OpenAI-compatible HTTP backend (LM Studio, llama.cpp server, Ollama, vLLM)."""
+    """OpenAI-compatible HTTP backend (NVIDIA NIM, OpenAI, Groq, Ollama, llama.cpp server, vLLM)."""
 
     def __init__(
         self,
@@ -188,7 +190,7 @@ class LLMAnalyzer:
     def from_env(cls) -> LLMAnalyzer:
         backend_kind = DEFAULT_BACKEND
         backend: Backend
-        if backend_kind in ("http", "lmstudio", "openai"):
+        if backend_kind in ("http", "openai", "nim", "nvidia"):
             backend = HttpBackend(
                 DEFAULT_HTTP_URL,
                 model=DEFAULT_HTTP_MODEL,

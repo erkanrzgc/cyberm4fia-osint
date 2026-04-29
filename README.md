@@ -48,7 +48,7 @@
 - **WHOIS / DNS / subdomain enumeration** (crt.sh)
 - **Wayback Machine** and paste-site presence
 - **Scan history** with SQLite + diff mode (`--diff` shows what changed between runs)
-- **Local LLM analysis** — plug in an OpenAI-compatible endpoint (LM Studio, llama.cpp, Ollama, vLLM) and get an AI-written identity / exposure report
+- **LLM-driven analysis** — defaults to NVIDIA NIM (free tier), works with any OpenAI-compatible endpoint (OpenAI, Groq, Ollama, llama.cpp server, vLLM); generates an AI-written identity / exposure report
 - **HTML + JSON + DOT graph** exports
 - **Tor / SOCKS / HTTP proxy** support
 - **MCP server** for Claude Desktop and other MCP-compatible clients
@@ -127,27 +127,34 @@ cyberm4fia johndoe --diff
 
 ---
 
-## AI Analysis (Local LLM)
+## AI Analysis
 
-`cyberm4fia` ships with an optional local-LLM analyst. It takes the structured scan result and generates a concise cybersecurity report: identity summary, strong linkages, exposures, and next steps — all as JSON, parsed and displayed inline.
+`cyberm4fia` ships with an optional LLM analyst. It takes the structured scan result and generates a concise cybersecurity report: identity summary, strong linkages, exposures, and next steps — all as JSON, parsed and displayed inline. The same backend powers the SE-arsenal pretext drafter.
 
-Bring your own model — any cybersecurity-tuned 7B/8B GGUF that fits on an 8 GB GPU works well. The default loader points at a Q4_K_M quant.
+### Option A — NVIDIA NIM (default, free tier)
 
-### Option A — LM Studio / OpenAI-compatible HTTP (default)
-
-1. Install [LM Studio](https://lmstudio.ai), download the model, and start the local server.
-2. In **Developer → Server Settings**, enable **Serve on Local Network**.
-3. Point `cyberm4fia` at the endpoint:
+1. Get a free key at [build.nvidia.com](https://build.nvidia.com) (~1000 req/month across all hosted models).
+2. Set the key:
 
 ```bash
-export CYBERM4FIA_LLM_URL="http://<host-ip>:1234/v1/chat/completions"
-export CYBERM4FIA_LLM_MODEL="<your-loaded-model-id>"
+export CYBERM4FIA_LLM_API_KEY="nvapi-..."
 cyberm4fia johndoe --ai
 ```
 
-For a VMware / WSL VM talking to an LM Studio instance on the Windows host, use the host adapter IP (e.g. `192.168.6.1` for VMnet8) instead of `localhost`.
+The defaults (`CYBERM4FIA_LLM_URL`, `CYBERM4FIA_LLM_MODEL`) already point at NVIDIA NIM with `meta/llama-3.3-70b-instruct`. Override `CYBERM4FIA_LLM_MODEL` for any other NIM-hosted model — see `.env.example` for curated red-team picks.
 
-### Option B — Embedded `llama-cpp-python`
+### Option B — Any other OpenAI-compatible endpoint
+
+The HTTP backend speaks plain OpenAI Chat Completions, so OpenAI, Groq, Ollama, llama.cpp server, and vLLM all work by overriding three env vars:
+
+```bash
+export CYBERM4FIA_LLM_URL="https://api.openai.com/v1/chat/completions"
+export CYBERM4FIA_LLM_API_KEY="sk-..."
+export CYBERM4FIA_LLM_MODEL="gpt-4o-mini"
+cyberm4fia johndoe --ai
+```
+
+### Option C — Embedded `llama-cpp-python` (offline GGUF)
 
 ```bash
 pip install -e '.[ai]'
@@ -161,9 +168,9 @@ cyberm4fia johndoe --ai
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `CYBERM4FIA_LLM_BACKEND` | `http` | `http` or `llama_cpp` |
-| `CYBERM4FIA_LLM_URL` | `http://localhost:1234/v1/chat/completions` | HTTP endpoint |
-| `CYBERM4FIA_LLM_MODEL` | `""` | Model ID for the HTTP request |
-| `CYBERM4FIA_LLM_API_KEY` | `lm-studio` | Bearer token |
+| `CYBERM4FIA_LLM_URL` | NVIDIA NIM chat completions | OpenAI-compatible endpoint |
+| `CYBERM4FIA_LLM_MODEL` | `meta/llama-3.3-70b-instruct` | Model ID sent in the request |
+| `CYBERM4FIA_LLM_API_KEY` | _(empty)_ | Bearer token — required for hosted backends |
 | `CYBERM4FIA_LLM_TIMEOUT` | `120` | HTTP timeout (seconds) |
 | `CYBERM4FIA_LLM_REPO` | _(your HF repo)_ | HF repo for `llama_cpp` backend |
 | `CYBERM4FIA_LLM_FILE` | _(your GGUF file)_ | GGUF filename |

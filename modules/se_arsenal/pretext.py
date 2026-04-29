@@ -3,7 +3,8 @@
 Given an OSINT payload (``ScanResult.to_dict()``) and a target email,
 produces a phishing-email draft with subject + body + technique +
 justification. Uses whatever ``core.analysis.llm.LLMAnalyzer`` is
-configured (LM Studio, NVIDIA NIM, OpenAI, …) — the backend is
+configured (NVIDIA NIM by default; OpenAI / Groq / Ollama work via
+the same OpenAI-compatible HTTP shape) — the backend is
 pluggable.
 
 We do **not** send the mail. Output is a ``PretextEmail`` the operator
