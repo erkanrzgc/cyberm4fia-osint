@@ -77,6 +77,56 @@ class ReconSubdomain:
 
 
 @dataclass(frozen=True)
+class DocumentMetadata:
+    """Metadata extracted from a public document (PDF / DOCX / XLSX).
+
+    Public corporate documents routinely leak the author's full name,
+    domain login, internal share paths, and the editing software used.
+    These are direct inputs to a SE pretext: knowing that ``acme.local``
+    is the AD domain or that ``\\\\acme-fs01\\reports`` is a real share
+    is more believable than any guess.
+
+    ``network_paths`` collects UNC / SMB paths discovered anywhere in
+    the document (typical sources: relationship XML in OOXML files, or
+    raw text in PDF). ``raw`` keeps the unparsed key/value blob so
+    downstream code can mine fields we did not normalize.
+    """
+
+    url: str
+    format: str  # "pdf" | "docx" | "xlsx" | "pptx"
+    author: str = ""
+    last_author: str = ""
+    creator: str = ""
+    title: str = ""
+    subject: str = ""
+    keywords: str = ""
+    company: str = ""
+    software: str = ""
+    created: str = ""
+    modified: str = ""
+    network_paths: tuple[str, ...] = ()
+    raw: dict = field(default_factory=dict)
+
+    def to_dict(self) -> dict:
+        return {
+            "url": self.url,
+            "format": self.format,
+            "author": self.author,
+            "last_author": self.last_author,
+            "creator": self.creator,
+            "title": self.title,
+            "subject": self.subject,
+            "keywords": self.keywords,
+            "company": self.company,
+            "software": self.software,
+            "created": self.created,
+            "modified": self.modified,
+            "network_paths": list(self.network_paths),
+            "raw": dict(self.raw),
+        }
+
+
+@dataclass(frozen=True)
 class LeakedSecret:
     """A credential-shaped string surfaced from public source code.
 
